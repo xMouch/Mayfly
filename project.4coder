@@ -1,0 +1,42 @@
+version(1);
+project_name = "Mayfly";
+patterns = {
+"*.c",
+"*.cpp",
+"*.h",
+"*.m",
+"*.bat",
+"*.sh",
+"*.4coder",
+};
+blacklist_patterns = {
+".*",
+};
+
+load_paths = {
+	{
+		{ {"."}, .recursive = true, .relative = true }, .os="linux"	
+	},
+};
+
+command_list = {
+ { .name = "build",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .cmd = { {"build.bat", .os ="win"  },
+            {"./build.sh" , .os ="linux"},
+            {"./build_mac.sh" , .os ="mac"  }, }, },
+ 
+ { .name = "run",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = false,
+   .cmd = { {"run.bat", .os ="win" },
+            {"./run_4coder.sh", .os ="linux" }, }, },
+ 
+ { .name = "debug",
+   .out = "*compilation*", .footer_panel = true, .save_dirty_files = false,
+   .cmd = { {"debug.bat", .os ="win" },
+            {"./debug.sh", .os ="linux" }, }, },
+};
+
+fkey_command[5] = "build";
+fkey_command[6] = "run";
+fkey_command[7] = "debug";
