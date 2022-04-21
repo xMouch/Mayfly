@@ -1,4 +1,4 @@
-#include "main.h"
+#include "tokens.h"
 
 s64 _currentIndex;
 Token* _currentToken;
