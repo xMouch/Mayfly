@@ -1,6 +1,6 @@
 #!/bin/bash
 DISABLE_RTTI_EXCEPTIONS="-fno-exceptions -fno-rtti"
-DISABLED_WARNINGS="-Wno-writable-strings -Wno-missing-braces -Wno-unused-function -Wno-format"
+DISABLED_WARNINGS="-Wno-writable-strings -Wno-missing-braces -Wno-unused-function -Wno-format -Wno-switch"
 
 INCLUDE_DIR="-I src/irlibs"
 
