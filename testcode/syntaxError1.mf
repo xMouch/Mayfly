@@ -1,0 +1,9 @@
+fn main(s64 argc, s64* argv) : s64
+{
+	s64 a;
+	s64 b;
+	s64 x;
+	s64 d;
+	(a*b+x/d)%3;
+	a+-b+;
+}

@@ -1,52 +1,5 @@
-#include "stdio.h"
-#include "stdlib.h"
-
-#include "ir_types.h"
-#include "ir_memory.h"
-#include "ir_string.h"
-#include "ir_ds.h"
-
-enum Token_Type
-{
-    TOKEN_UNKOWN = 0,
-    TOKEN_ID,    
-    TOKEN_NUM,    
-    TOKEN_STR_LIT, 
-    
-    TOKEN_FN        = 1000,
-    TOKEN_RETURN,
-    TOKEN_IF,
-    TOKEN_ELSE,
-    TOKEN_FOR,
-    TOKEN_WHILE,
-    TOKEN_BREAK,
-    TOKEN_CONT,
-    TOKEN_STRUCT,
-    
-    TOKEN_S64       = 1050,
-    TOKEN_F64,       
-    TOKEN_C8,
-    
-    TOKEN_D_EQ      = 1100, // ==
-    TOKEN_AND, // &&
-    TOKEN_OR, // ||
-    TOKEN_NOTEQ, // !=
-    
-    /*
-       All single charactars are the same value as their ASCII value so A == 'A' == 65
-        
-    */
-    
-};
-
-struct Token
-{
-    String text;
-    Token_Type type;
-    msi line;
-    msi column;
-};
-
+#include "main.h"
+#include "parser.cpp"
 
 String read_entire_file(c8* file_name, Memory_Arena* arena)
 {
@@ -149,8 +102,13 @@ Token* tokenize(String file, Heap_Allocator* heap)
 int main(s32 argc, c8** argv)
 {
     Memory_Arena arena = create_memory_arena(IR_MEGABYTES(256), (u8*)malloc(IR_MEGABYTES(256)));
-    
-    String file = read_entire_file("testcode/test.mf", &arena);
+
+    String file;
+
+    if (argc > 1){
+        file = read_entire_file(argv[1], &arena);
+    }else
+        file = read_entire_file("testcode/test.mf", &arena);
     
     Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(64), 0);
     
@@ -161,8 +119,8 @@ int main(s32 argc, c8** argv)
     {
         fprintf(stdout, "Type: %u, (%.*s)\n", tokens[i].type, tokens[i].text);
     }
-    
-    
+
+    parse(tokens);
     
     return 0;
 }
