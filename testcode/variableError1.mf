@@ -1,0 +1,10 @@
+fn main(s64 argc, s64 *argv) : s64
+{
+	s64 a;
+	if (argc == 5){
+		s64 b;
+	}
+	a=a+1;
+	b=b+1;
+}
+

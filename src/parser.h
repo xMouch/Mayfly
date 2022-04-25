@@ -1,73 +1,220 @@
 #include "tokens.h"
 
-s64 _currentIndex;
-Token* _currentToken;
-Token* _tokens;
-msi _parsing;
+struct Variable{
+    Token_Type dataType; //only 1050-1099 allowed
+    String name;
+    msi id;
+    msi level;
+};
+
+struct Function{
+    Token_Type returnType;
+    String name;
+    Variable* arguments;
+};
+
+Heap_Allocator* p_heap;
+
+s64 p_currentIndex;
+Token* p_currentToken;
+Token* p_tokens;
+b8 p_parsing;
+
+Variable* p_variables;
+msi variableCount = 0;
+msi p_currentScope;
+
+Function* p_functions;
+
+void increaseScope(){
+    p_currentScope++;
+}
+
+void decreaseScope(){
+    while(ARR_LAST(p_variables)->level==p_currentScope)
+        ARR_POP(p_variables);
+    p_currentScope--;
+}
 
 void nextToken(){
-    if (_currentIndex >= (s64)ARR_LEN(_tokens)-1){
-        _parsing = 0;
-    } else {
-        _currentIndex++;
-        _currentToken = &_tokens[_currentIndex];
-    }
+    p_currentIndex++;
+    p_currentToken = &p_tokens[p_currentIndex];
+    if (p_currentToken->type == TOKEN_EOF)
+        p_parsing = false;
+}
+
+void previousToken(){
+    p_currentIndex--;
+    p_currentToken = &p_tokens[p_currentIndex];
+    p_parsing = true;
+}
+
+Token getPreviousToken(msi howFarBack){
+    if (p_currentIndex-howFarBack >= 0)
+        return p_tokens[p_currentIndex-howFarBack];
+    return Token{};
 }
 
 b8 accept(msi tokenType){
-    if (_parsing == 1 && _currentToken->type == tokenType) {
+    if (p_parsing == 1 && p_currentToken->type == tokenType) {
         nextToken();
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 b8 expect(msi tokenType){
     if (accept(tokenType))
-        return 1;
-    printf("Error, expected: %u at %u:%u", tokenType,
-               _currentToken->line,
-               _parsing?_currentToken->column:_currentToken->column+_currentToken->text.length);
+        return true;
+    printf("Error at %llu:%llu, expected: %.*s got: %.*s\n",
+           p_currentToken->line,
+           p_parsing ? p_currentToken->column : p_currentToken->column + p_currentToken->text.length,
+           type_to_str(tokenType),
+           type_to_str(p_currentToken->type).length, type_to_str(p_currentToken->type).data);
     exit(EXIT_FAILURE);
-    return 0;
 }
 
-b8 expectType(){
-    if (accept(TOKEN_S64) || accept(TOKEN_F64) || accept(TOKEN_C8))
-        return 1;
-    printf("Error, expected type at %u:%u",
-           _currentToken->line,
-           _parsing?_currentToken->column:_currentToken->column+_currentToken->text.length);
-    exit(EXIT_FAILURE);
-    return 0;
+//this method does identifier checking
+//TOKEN_UNKNOWN->not a declaration; TOKEN_S64, TOKEN_F64, TOKEN_B8
+b8 inspectId(Token_Type declarationType, Token t){
+    if (!declarationType){
+        for (msi i=0;i<ARR_LEN(p_variables);i++){
+            if (cmp_string(t.text,p_variables[i].name)){
+                return true;
+            }
+        }
+        printf("Error, undeclared identifier: %.*s at %u:%u\n", t.text,
+               t.line,
+               p_parsing ? t.column : t.column + t.text.length);
+        exit(EXIT_FAILURE);
+    }
+    else {
+        for (msi i=0;i<ARR_LEN(p_variables);i++){
+            if (cmp_string(t.text,p_variables[i].name) && p_currentScope == p_variables[i].level){
+                printf("Error, redeclared identifier: %.*s at %u:%u\n", t.text,
+                       t.line,
+                       p_parsing ? t.column : t.column + t.text.length);
+                exit(EXIT_FAILURE);
+            }
+        }
+        Variable v{};
+        v.level = p_currentScope;
+        v.dataType = declarationType;
+        v.id = variableCount;
+        v.name = t.text;
+        ARR_PUSH(p_variables,v);
+        variableCount++;
+        return true;
+    }
 }
 
-b8 acceptType(){
-    if (accept(TOKEN_S64) || accept(TOKEN_F64) || accept(TOKEN_C8))
-        return 1;
-    return 0;
+b8 acceptId(Token_Type declarationType){
+    if (accept(TOKEN_ID)){
+        return inspectId(declarationType, getPreviousToken(1));
+    }
+    return false;
+}
+
+b8 expectId(Token_Type declarationType){
+    Token t = *p_currentToken;
+    if (acceptId(declarationType))
+        return true;
+    printf("Error, expected: %u at %llu:%llu\n", declarationType,
+           t.line,
+           p_parsing ? t.column : t.column + t.text.length);
+    exit(EXIT_FAILURE);
+}
+
+Token_Type expectType(){
+    if (accept(TOKEN_S64))
+        return TOKEN_S64;
+    if (accept(TOKEN_F64))
+        return TOKEN_F64;
+    if (accept(TOKEN_C8))
+        return TOKEN_C8;
+    printf("Error, expected type at %llu:%llu\n",
+           p_currentToken->line,
+           p_parsing ? p_currentToken->column : p_currentToken->column + p_currentToken->text.length);
+    exit(EXIT_FAILURE);
+}
+
+Token_Type acceptType(){
+    if (accept(TOKEN_S64))
+        return TOKEN_S64;
+    if (accept(TOKEN_F64))
+        return TOKEN_F64;
+    if (accept(TOKEN_C8))
+        return TOKEN_C8;
+    return TOKEN_UNKOWN;
 }
 
 void expression();
 void statements();
 
-b8 statement(){
-    if (acceptType()){
+void function(b8 declaration){
+    if (declaration){
+        Token_Type t;
+        Function f{};
+        expect(TOKEN_FN);
         expect(TOKEN_ID);
-        expect('=');
-        expression();
-        expect(';');
-    }else if (accept(TOKEN_ID)){ //TODO: add logic to save previous identifiers
-        if (accept('(')){
-            //function call TODO: count necessary arguments beforehand
-            expression();
+        f.name = getPreviousToken(1).text;
+        ARR_INIT(f.arguments,4,p_heap);
+        expect('(');
+        if ((t=acceptType()) != TOKEN_UNKOWN){
+            accept('*');
+            expectId(t);
+            Variable* v = ARR_LAST(p_variables);
+            ARR_PUSH(f.arguments, *v);
             while (accept(',')){
-                expression();
+                t = expectType();
+                accept('*');
+                expectId(t);
+                v = ARR_LAST(p_variables);
+                ARR_PUSH(f.arguments, *v);
             }
-            expect(')');
+        }
+        expect(')');
+        expect(':');
+        f.returnType = expectType(); //no support for void return
+        ARR_PUSH(p_functions,f);
+        expect('{');
+        increaseScope();
+        statements();
+        decreaseScope();
+        expect('}');
+    } else {
+        //TODO: function signature checking requires knowledge of expression type
+        expect(TOKEN_ID);
+        expect('(');
+        if(!accept(')'))
+            expression();
+        while (accept(',')){
+            expression();
+        }
+        expect(')');
+    }
+}
+
+b8 statement(){
+    Token_Type type;
+    if ((type = acceptType()) != TOKEN_UNKOWN){
+        accept('*');
+        expectId(type);
+        if(accept('='))
+            expression();
+        expect(';');
+    }else if (accept(TOKEN_ID)){
+        if (accept('(')){
+            previousToken();
+            previousToken();
+            function(false);
+            expect(';');
+        }else if (accept('=')){
+            inspectId(TOKEN_UNKOWN, getPreviousToken(2));
+            expression();
             expect(';');
         }else{
-            expect('=');
+            previousToken();
             expression();
             expect(';');
         }
@@ -76,47 +223,60 @@ b8 statement(){
         expression();
         expect(')');
         expect('{');
+        increaseScope();
         statements();
+        decreaseScope();
         expect('}');
         if (accept(TOKEN_ELSE)){
             expect('{');
+            increaseScope();
             statements();
+            decreaseScope();
             expect('}');
         }
     }else if (accept(TOKEN_FOR)){
         expect('(');
-        if(acceptType()){
-            expect(TOKEN_ID);
+        increaseScope();
+        if((type = acceptType()) != TOKEN_UNKOWN){
+            expectId(type);
             expect('=');
-        }else if (accept(TOKEN_ID))
+        }else if (acceptId(TOKEN_UNKOWN))
             expect('=');
         expression();
         expect(';');
         expression();
         expect(';');
-        expect(TOKEN_ID);
+        expectId(TOKEN_UNKOWN);
         expect('=');
         expression();
         expect(')');
         expect('{');
         statements();
+        decreaseScope();
         expect('}');
     }else if (accept(TOKEN_WHILE)){
         expect('(');
         expression();
         expect(')');
         expect('{');
+        increaseScope();
         statements();
+        decreaseScope();
         expect('}');
-    }else if (accept(TOKEN_BREAK))
+    }else if (accept(TOKEN_BREAK) || accept(TOKEN_CONT))
         expect(';');
-    else if (accept(TOKEN_CONT))
+    else if (accept(TOKEN_RETURN)){
+        expression();
         expect(';');
-    else if (accept(TOKEN_RETURN))
+    }
+    else if (accept('}')){
+        previousToken();
+        return false;
+    }else{
+        expression(); //messes with the error msgs
         expect(';');
-    else
-        return 0;
-    return 1;
+    }
+    return true;
 }
 
 void statements(){
@@ -124,7 +284,16 @@ void statements(){
 }
 
 void term(){
-    if (!accept(TOKEN_ID)&&!accept(TOKEN_NUM)&&!accept(TOKEN_STR_LIT)){
+    if (accept(TOKEN_ID)){
+        if (accept('(')){
+            previousToken();
+            previousToken();
+            function(false);
+        }
+        else
+            inspectId(TOKEN_UNKOWN, getPreviousToken(1));
+    }
+    else if (!accept(TOKEN_NUM) && !accept(TOKEN_STR_LIT)){
         expect('(');
         expression();
         expect(')');
@@ -169,38 +338,27 @@ void expression(){
 }
 
 void block(){
-    if (acceptType()){
-        expect(TOKEN_ID);
+    Token_Type t;
+    if ((t = acceptType()) != TOKEN_UNKOWN){
+        expectId(t);
         if (accept('='))
             expression();
         expect(';');
     }
     else{
-        expect(TOKEN_FN);
-        expect(TOKEN_ID);
-        expect('(');
-        if (acceptType()){
-            expect(TOKEN_ID);
-            while (accept(',')){
-                expectType();
-                expect(TOKEN_ID);
-            }
-        }
-        expect(')');
-        expect(':');
-        expectType(); //no support for void return
-        expect('{');
-        statements();
-        expect('}');
+        function(true);
     }
 }
 
-void parse(Token* tokens){
-    _tokens = tokens;
-    _currentIndex = -1;
-    _parsing = 1;
+void parse(Token* tokens, Heap_Allocator* heap){
+    p_tokens = tokens;
+    p_currentIndex = -1;
+    p_parsing = true;
+    ARR_INIT(p_variables,64, heap);
+    ARR_INIT(p_functions,8, heap);
+    p_heap = heap;
     nextToken();
-    while(_parsing){
+    while(p_parsing){
         block();
     }
 }

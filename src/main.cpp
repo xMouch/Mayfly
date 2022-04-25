@@ -45,7 +45,7 @@ int main(s32 argc, c8** argv)
         fprintf(stdout, "Type: %.*s, '%.*s'\n", type_to_str(tokens[i].type), tokens[i].text);
     }
 
-    //parse(tokens);
+    parse(tokens, &heap);
     
     return 0;
 }
