@@ -3,6 +3,7 @@
 
 struct Variable{
     Token_Type dataType; //only 1050-1099 allowed
+    msi pointerLvl; //0 -> not a pointer
     String name;
     msi id;
     msi level;
@@ -31,6 +32,13 @@ Function* p_functions;
 Node* makeNode(Node newNode){
     ARR_PUSH(p_nodes, newNode);
     return ARR_LAST(p_nodes);
+}
+
+Node* derefChain(Node* child, msi count){
+    if(count > 0)
+        return makeNode({.type=N_DEREF, .left=derefChain(child, count-1)});
+    else
+        return child;
 }
 
 void increaseScope(){
@@ -83,7 +91,7 @@ b8 expect(msi tokenType){
 
 //this method does identifier checking
 //TOKEN_UNKNOWN->not a declaration; TOKEN_S64, TOKEN_F64, TOKEN_B8
-msi inspectId(Token_Type declarationType, Token t){
+msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
     if (!declarationType){
         for (msi i=0;i<ARR_LEN(p_variablesInScope);i++){
             if (cmp_string(t.text,p_variablesInScope[i].name)){
@@ -109,24 +117,25 @@ msi inspectId(Token_Type declarationType, Token t){
         v.dataType = declarationType;
         v.id = ARR_LEN(p_variables);
         v.name = t.text;
+        v.pointerLvl = pointerLvl;
         ARR_PUSH(p_variables,v);
         ARR_PUSH(p_variablesInScope,v);
         return v.id;
     }
 }
 
-b8 acceptId(Token_Type declarationType){
+b8 acceptId(Token_Type declarationType, msi pointerLvl){
     if (accept(TOKEN_ID)){
-        inspectId(declarationType, getPreviousToken(1));
+        inspectId(declarationType, pointerLvl, getPreviousToken(1));
         return true;
     }
     return false;
 }
 
-msi expectId(Token_Type declarationType){
+msi expectId(Token_Type declarationType, msi pointerLvl){
     Token t = *p_currentToken;
     if (accept(TOKEN_ID))
-        return inspectId(declarationType, t);
+        return inspectId(declarationType, pointerLvl, t);
     printf("Error, expected: %u at %llu:%llu\n", declarationType,
            t.line,
            p_parsing ? t.column : t.column + t.text.length);
@@ -159,6 +168,40 @@ Token_Type acceptType(){
 Node* expression();
 Node* statements();
 
+Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
+    Node* n;
+    if(varType != TOKEN_UNKOWN){
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        msi index = expectId(varType, pointerLvl);
+
+        if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
+            n = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
+        }
+        else
+            n = makeNode({.type=N_EMPTY});
+    }else{
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        if (acceptId(TOKEN_UNKOWN, pointerLvl)){
+            msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
+            if(accept('='))
+                n = makeNode({.type=N_ASSIGN,.left=derefChain(makeNode({.type=N_VAR,.sValue=(s64)index}),pointerLvl),.right=expression()});
+            else{
+                previousToken();
+                n = expression();
+                n = derefChain(n, pointerLvl);
+            }
+        }else{
+            n = expression();
+            n = derefChain(n, pointerLvl);
+        }
+    }
+    return n;
+}
+
 Node* function(b8 declaration){
     if (declaration){
         Token_Type t;
@@ -169,14 +212,18 @@ Node* function(b8 declaration){
         ARR_INIT(f.arguments,4,p_heap);
         expect('(');
         if ((t=acceptType()) != TOKEN_UNKOWN){
-            accept('*');
-            expectId(t);
+            msi pointerLvl = 0;
+            while (accept('*'))
+                pointerLvl++;
+            expectId(t, pointerLvl);
             Variable* v = ARR_LAST(p_variablesInScope);
             ARR_PUSH(f.arguments, *v);
             while (accept(',')){
                 t = expectType();
-                accept('*');
-                expectId(t);
+                pointerLvl = 0;
+                while (accept('*'))
+                    pointerLvl++;
+                expectId(t, pointerLvl);
                 v = ARR_LAST(p_variablesInScope);
                 ARR_PUSH(f.arguments, *v);
             }
@@ -208,31 +255,18 @@ Node* function(b8 declaration){
 Node* statement(){
     Token_Type type;
     Node* n = nullptr;
+    if (accept('}')){
+        previousToken();
+        return nullptr;
+    }
+
     if ((type = acceptType()) != TOKEN_UNKOWN){
-        accept('*');
-        msi index = expectId(type);
-        if(accept('=')){
-            n = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
-        }
-        else
-            n = makeNode({.type=N_EMPTY});
+        n = assignmentOrExpression(type, true);
         expect(';');
-    }else if (accept(TOKEN_ID)){
-        if (accept('(')){
-            previousToken();
-            previousToken();
-            n = function(false);
-            expect(';');
-        }else if (accept('=')){
-            msi index = inspectId(TOKEN_UNKOWN, getPreviousToken(2));
-            n = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
-            expect(';');
-        }else{
-            previousToken();
-            n = expression();
-            expect(';');
-        }
-    }else if (accept(TOKEN_IF)){
+        return n;
+    }
+
+    if (accept(TOKEN_IF)){
         expect('(');
         Node* e = expression();
         expect(')');
@@ -250,61 +284,72 @@ Node* statement(){
         }else{
             n = makeNode({.type=N_IF, .left=e, .right = stm1});
         }
-    }else if (accept(TOKEN_FOR)){
+        return n;
+    }
+
+    if (accept(TOKEN_FOR)){
         expect('(');
         increaseScope();
-        Node* n1;
-        if((type = acceptType()) != TOKEN_UNKOWN){
-            msi index = expectId(type);
-            expect('=');
-            n1 = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
-        }else if (acceptId(TOKEN_UNKOWN)){
-            msi index = inspectId(TOKEN_UNKOWN, getPreviousToken(1));
-            expect('=');
-            n1 = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
+        Node *n1, *n2, *n3;
+        if (!accept(';')){
+            type = acceptType();
+            n1 = assignmentOrExpression(type, true);
+            expect(';');
         }else{
-            n1 = expression();
+            n1 = makeNode({N_EMPTY});
         }
-        expect(';');
-        Node* n2 = expression();
-        expect(';');
-        expectId(TOKEN_UNKOWN);
-        expect('=');
-        Node* n3 = expression();
-        expect(')');
+        if (!accept(';')){
+            n2 = assignmentOrExpression(TOKEN_UNKOWN,true);
+            expect(';');
+        }
+        else{
+            n2 = makeNode({N_EMPTY});
+        }
+        if (!accept(')')){
+            n3 = assignmentOrExpression(TOKEN_UNKOWN,true);
+            expect(')');
+        }else
+            n3 = makeNode({N_EMPTY});
+
         expect('{');
         n = makeNode({.type=N_FOR, .left=
                       makeNode({.type=N_FOR, .left=
                       makeNode({.type=N_FOR, .left=n1, .right=n2}), .right=n3}), .right=statements()});
         decreaseScope();
         expect('}');
-    }else if (accept(TOKEN_WHILE)){
+        return n;
+    }
+
+    if (accept(TOKEN_WHILE)){
         expect('(');
-        Node* n1 = expression();
+        Node* n1 = assignmentOrExpression(TOKEN_UNKOWN,true);
         expect(')');
         expect('{');
         increaseScope();
         n = makeNode({.type=N_WHILE, .left=n1, .right=statements()});
         decreaseScope();
         expect('}');
-    }else if (accept(TOKEN_BREAK)){
+        return n;
+    }
+
+    if (accept(TOKEN_BREAK)){
         n = makeNode({.type=N_BREAK});
         expect(';');
+        return n;
     }
-    else if(accept(TOKEN_CONT)){
+    if(accept(TOKEN_CONT)){
         n = makeNode({.type=N_CONTINUE});
         expect(';');
-    }else if (accept(TOKEN_RETURN)){
+        return n;
+    }
+    if (accept(TOKEN_RETURN)){
         n = makeNode({.type=N_RETURN, .left=expression()});
         expect(';');
+        return n;
     }
-    else if (accept('}')){
-        previousToken();
-        return nullptr;
-    }else{
-        n = expression(); //messes with the error msgs
-        expect(';');
-    }
+
+    n = assignmentOrExpression(TOKEN_UNKOWN,true);
+    expect(';');
     return n;
 }
 
@@ -324,7 +369,7 @@ Node* term(){
             return function(false);
         }
         else{
-            msi index = inspectId(TOKEN_UNKOWN, getPreviousToken(1));
+            msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
             return makeNode({.type=N_VAR, .sValue=(s64)index});
         }
     }
@@ -334,10 +379,7 @@ Node* term(){
             return makeNode({.type=N_FLOAT, .fValue=val});
         }else{
             s64 val = strtol(getPreviousToken(1).text.data, &p_currentToken->text.data,10);
-            if (val == 0 || val == 1)
-                return makeNode({.type=N_BOOL, .bValue=(b8)val});
-            else
-                return makeNode({.type=N_NUM, .sValue=val});
+           return makeNode({.type=N_NUM, .sValue=val});
         }
     }else if(accept(TOKEN_STR_LIT)){
         return makeNode({.type=N_STR, .str=getPreviousToken(1).text});
@@ -355,7 +397,7 @@ Node* exp2(){
     if (accept('-')){
         return makeNode({.type=N_NEG,.left=term()});
     } else if (accept('*')){
-        return makeNode({.type=N_POINTER,.left=term()});
+        return makeNode({.type=N_DEREF,.left=term()});
     } else if (accept('!')){
         return makeNode({.type=N_NOT,.left=term()});
     } else {
@@ -407,7 +449,10 @@ Node* block(){
     Token_Type t;
     if ((t = acceptType()) != TOKEN_UNKOWN){
         Node* node = nullptr;
-        msi index = expectId(t);
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        msi index = expectId(t, pointerLvl);
         if (accept('=')){
             node = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.sValue=(s64)index}),.right=expression()});
         }
@@ -425,11 +470,25 @@ Node* program(){
     }
     return nullptr;
 }
+void printVar(Variable v){
+    printf("%.*s ", type_to_str(v.dataType));
+    printf("%.*s", v.pointerLvl, "****************");
+    printf("%.*s ", v.name);
+}
 
 void printTree(Node* n, s64 offset){
     if (n != nullptr){
         printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
-        printf("%.*s %u\n", type_to_str(n->type), n->sValue);
+        if(n->type==N_VAR){
+            printVar(p_variables[n->sValue]);
+            printf("\n");
+        }else if(n->type==N_FUNC){
+            printf("%.*s %.*s (", type_to_str(n->type), p_functions[n->sValue].name);
+            for (msi i=0;i< ARR_LEN(p_functions[n->sValue].arguments);i++)
+                printVar(p_functions[n->sValue].arguments[i]);
+            printf(")\n");
+        }else
+            printf("%.*s %u\n", type_to_str(n->type), n->sValue);
         printTree(n->left, offset+1);
         printTree(n->right, offset+1);
     }

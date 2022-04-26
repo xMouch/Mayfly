@@ -15,7 +15,7 @@ enum NodeType{
     N_DIV,
     N_MOD,
     N_NEG,
-    N_POINTER,
+    N_DEREF,
     N_NOT,
     N_IF,
     N_ELSE,
@@ -29,7 +29,6 @@ enum NodeType{
     N_NUM,
     N_STR,
     N_FLOAT,
-    N_BOOL,
     N_VAR
 };
 
@@ -63,7 +62,7 @@ String type_to_str(NodeType t)
         case N_DIV:  return IR_CONSTZ("N_DIV");
         case N_MOD:  return IR_CONSTZ("N_MOD");
         case N_NEG:  return IR_CONSTZ("N_NEG");
-        case N_POINTER:  return IR_CONSTZ("N_POINTER");
+        case N_DEREF:  return IR_CONSTZ("N_DEREF");
         case N_NOT:  return IR_CONSTZ("N_NOT");
         case N_IF:  return IR_CONSTZ("N_IF");
         case N_ELSE:  return IR_CONSTZ("N_ELSE");
@@ -77,7 +76,6 @@ String type_to_str(NodeType t)
         case N_NUM:  return IR_CONSTZ("N_NUM");
         case N_STR:  return IR_CONSTZ("N_STR");
         case N_FLOAT:  return IR_CONSTZ("N_FLOAT");
-        case N_BOOL:  return IR_CONSTZ("N_BOOL");
         case N_VAR:  return IR_CONSTZ("N_VAR");
         default: return IR_CONSTZ("NODE TYPE PRINT NOT IMPLEMENTED");
     }
