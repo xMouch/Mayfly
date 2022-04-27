@@ -42,10 +42,10 @@ int main(s32 argc, c8** argv)
     
     for(msi i = 0; i < ARR_LEN(tokens); ++i)
     {
-        fprintf(stdout, "Type: %.*s, '%.*s'\n", type_to_str(tokens[i].type), tokens[i].text);
+        fprintf(stdout, "Type: %.*s, '%.*s'  Line: %llu  Column: %llu\n", type_to_str(tokens[i].type), tokens[i].text, tokens[i].line, tokens[i].column);
     }
 
-    //parse(tokens);
+    parse(tokens);
     
     return 0;
 }

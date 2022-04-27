@@ -1,7 +1,6 @@
 #ifndef TOKENIZER_H
 #define TOKENIZER_H
 
-
 struct Tokenizer
 {
     String file;

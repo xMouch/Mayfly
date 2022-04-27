@@ -43,6 +43,8 @@ enum Token_Type
     
 };
 
+
+//TODO(Michael) ADD whole line to token for better error msg
 struct Token
 {
     String text;
