@@ -53,7 +53,6 @@ struct Token
     msi column;
 };
 
-
 static
 String type_to_str(Token_Type t)
 {
@@ -100,8 +99,16 @@ String type_to_str(Token_Type t)
         case ',': return IR_CONSTZ("','");
         case '.': return IR_CONSTZ("'.'");
         case '#': return IR_CONSTZ("'#'");
+        case '&': return IR_CONSTZ("'&'");
+        case '|': return IR_CONSTZ("'|'");
         default: return IR_CONSTZ("TOKEN TYPE PRINT NOT IMPLEMENTED");
     }
+}
+
+static
+String type_to_str(msi t)
+{
+    return type_to_str((Token_Type)t);
 }
 
 

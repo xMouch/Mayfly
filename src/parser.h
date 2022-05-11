@@ -1,206 +1,511 @@
 #include "tokens.h"
+#include "nodes.h"
 
-s64 _currentIndex;
-Token* _currentToken;
-Token* _tokens;
-msi _parsing;
+Heap_Allocator* p_heap;
+
+s64 p_currentIndex;
+Token* p_currentToken;
+Token* p_tokens;
+b8 p_parsing;
+
+Node* p_nodes;
+Variable* p_variables;
+Variable* p_variablesInScope;
+msi p_currentScope;
+
+Function* p_functions;
+
+Node* makeNode(Node newNode){
+    ARR_PUSH(p_nodes, newNode);
+    return ARR_LAST(p_nodes);
+}
+
+Node* derefChain(Node* child, msi count){
+    if(count > 0)
+        return makeNode({.type=N_DEREF, .left=derefChain(child, count-1)});
+    else
+        return child;
+}
+
+void increaseScope(){
+    p_currentScope++;
+}
+
+void decreaseScope(){
+    while(ARR_LAST(p_variablesInScope)->level==p_currentScope)
+        ARR_POP(p_variablesInScope);
+    p_currentScope--;
+}
 
 void nextToken(){
-    if (_currentIndex >= (s64)ARR_LEN(_tokens)-1){
-        _parsing = 0;
-    } else {
-        _currentIndex++;
-        _currentToken = &_tokens[_currentIndex];
-    }
+    p_currentIndex++;
+    p_currentToken = &p_tokens[p_currentIndex];
+    if (p_currentToken->type == TOKEN_EOF)
+        p_parsing = false;
+}
+
+void previousToken(){
+    p_currentIndex--;
+    p_currentToken = &p_tokens[p_currentIndex];
+    p_parsing = true;
+}
+
+Token getPreviousToken(msi howFarBack){
+    if (p_currentIndex-howFarBack >= 0)
+        return p_tokens[p_currentIndex-howFarBack];
+    return Token{};
 }
 
 b8 accept(msi tokenType){
-    if (_parsing == 1 && _currentToken->type == tokenType) {
+    if (p_parsing == 1 && p_currentToken->type == tokenType) {
         nextToken();
-        return 1;
+        return true;
     }
-    return 0;
+    
+    
+    return false;
 }
 
 b8 expect(msi tokenType){
     if (accept(tokenType))
-        return 1;
-    printf("Error, expected: %u at %u:%u", tokenType,
-               _currentToken->line,
-               _parsing?_currentToken->column:_currentToken->column+_currentToken->text.length);
+        return true;
+    printf("Error at %llu:%llu, expected: %.*s got: %.*s\n",
+           p_currentToken->line,
+           p_parsing ? p_currentToken->column : p_currentToken->column + p_currentToken->text.length,
+           type_to_str(tokenType),
+           type_to_str(p_currentToken->type).length, type_to_str(p_currentToken->type).data);
     exit(EXIT_FAILURE);
-    return 0;
 }
 
-b8 expectType(){
-    if (accept(TOKEN_S64) || accept(TOKEN_F64) || accept(TOKEN_C8))
-        return 1;
-    printf("Error, expected type at %u:%u",
-           _currentToken->line,
-           _parsing?_currentToken->column:_currentToken->column+_currentToken->text.length);
-    exit(EXIT_FAILURE);
-    return 0;
-}
-
-b8 acceptType(){
-    if (accept(TOKEN_S64) || accept(TOKEN_F64) || accept(TOKEN_C8))
-        return 1;
-    return 0;
-}
-
-void expression();
-void statements();
-
-b8 statement(){
-    if (acceptType()){
-        expect(TOKEN_ID);
-        expect('=');
-        expression();
-        expect(';');
-    }else if (accept(TOKEN_ID)){ //TODO: add logic to save previous identifiers
-        if (accept('(')){
-            //function call TODO: count necessary arguments beforehand
-            expression();
-            while (accept(',')){
-                expression();
+//this method does identifier checking
+//TOKEN_UNKNOWN->not a declaration; TOKEN_S64, TOKEN_F64, TOKEN_B8
+msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
+    if (!declarationType){
+        for (msi i=0;i<ARR_LEN(p_variablesInScope);i++){
+            if (cmp_string(t.text,p_variablesInScope[i].name)){
+                return i;
             }
-            expect(')');
-            expect(';');
-        }else{
-            expect('=');
-            expression();
-            expect(';');
         }
-    }else if (accept(TOKEN_IF)){
+        printf("Error, undeclared identifier: %.*s at %u:%u\n", t.text,
+               t.line,
+               p_parsing ? t.column : t.column + t.text.length);
+        exit(EXIT_FAILURE);
+    }
+    else {
+        for (msi i=0;i<ARR_LEN(p_variablesInScope);i++){
+            if (cmp_string(t.text,p_variablesInScope[i].name) && p_currentScope == p_variablesInScope[i].level){
+                printf("Error, redeclared identifier: %.*s at %u:%u\n", t.text,
+                       t.line,
+                       p_parsing ? t.column : t.column + t.text.length);
+                exit(EXIT_FAILURE);
+            }
+        }
+        Variable v{};
+        v.level = p_currentScope;
+        v.dataType = declarationType;
+        v.id = ARR_LEN(p_variables)+10;
+        v.name = t.text;
+        v.pointerLvl = pointerLvl;
+        ARR_PUSH(p_variables,v);
+        ARR_PUSH(p_variablesInScope,v);
+        return v.id;
+    }
+}
+
+b8 acceptId(Token_Type declarationType, msi pointerLvl){
+    if (accept(TOKEN_ID)){
+        inspectId(declarationType, pointerLvl, getPreviousToken(1));
+        return true;
+    }
+    return false;
+}
+
+msi expectId(Token_Type declarationType, msi pointerLvl){
+    Token t = *p_currentToken;
+    if (accept(TOKEN_ID))
+        return inspectId(declarationType, pointerLvl, t);
+    printf("Error, expected: %u at %llu:%llu\n", declarationType,
+           t.line,
+           p_parsing ? t.column : t.column + t.text.length);
+    exit(EXIT_FAILURE);
+}
+
+Token_Type expectType(){
+    if (accept(TOKEN_S64))
+        return TOKEN_S64;
+    if (accept(TOKEN_F64))
+        return TOKEN_F64;
+    if (accept(TOKEN_C8))
+        return TOKEN_C8;
+    printf("Error, expected type at %llu:%llu\n",
+           p_currentToken->line,
+           p_parsing ? p_currentToken->column : p_currentToken->column + p_currentToken->text.length);
+    exit(EXIT_FAILURE);
+}
+
+Token_Type acceptType(){
+    if (accept(TOKEN_S64))
+        return TOKEN_S64;
+    if (accept(TOKEN_F64))
+        return TOKEN_F64;
+    if (accept(TOKEN_C8))
+        return TOKEN_C8;
+    return TOKEN_UNKOWN;
+}
+
+Node* expression();
+Node* statements();
+
+Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
+    Node* n;
+    if(varType != TOKEN_UNKOWN){
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        msi index = expectId(varType, pointerLvl);
+
+        if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
+            n = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.var=&p_variables[index]}),.right=expression()});
+        }
+        else
+            n = makeNode({.type=N_EMPTY});
+    }else{
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        if (acceptId(TOKEN_UNKOWN, pointerLvl)){
+            msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
+            if(accept('='))
+                n = makeNode({.type=N_ASSIGN,.left=derefChain(makeNode({.type=N_VAR,.var=&p_variables[index]}),pointerLvl),.right=expression()});
+            else{
+                previousToken();
+                n = expression();
+                n = derefChain(n, pointerLvl);
+            }
+        }else{
+            n = expression();
+            n = derefChain(n, pointerLvl);
+        }
+    }
+    return n;
+}
+
+Node* function(b8 declaration){
+    if (declaration){
+        Token_Type t;
+        Function f{};
+        expect(TOKEN_FN);
+        expect(TOKEN_ID);
+        f.name = getPreviousToken(1).text;
+        ARR_INIT(f.arguments,4,p_heap);
         expect('(');
-        expression();
+        if ((t=acceptType()) != TOKEN_UNKOWN){
+            msi pointerLvl = 0;
+            while (accept('*'))
+                pointerLvl++;
+            expectId(t, pointerLvl);
+            Variable* v = ARR_LAST(p_variablesInScope);
+            ARR_PUSH(f.arguments, *v);
+            while (accept(',')){
+                t = expectType();
+                pointerLvl = 0;
+                while (accept('*'))
+                    pointerLvl++;
+                expectId(t, pointerLvl);
+                v = ARR_LAST(p_variablesInScope);
+                ARR_PUSH(f.arguments, *v);
+            }
+        }
+        expect(')');
+        expect(':');
+        f.returnType = expectType(); //no support for void return
+        ARR_PUSH(p_functions,f);
+        expect('{');
+        increaseScope();
+        Node* n = makeNode({.type=N_FUNC,.func=ARR_LAST(p_functions), .left=statements()});
+        decreaseScope();
+        expect('}');
+        return n;
+    } else {
+        //TODO: function signature checking requires knowledge of expression type
+        expect(TOKEN_ID);
+        expect('(');
+        if(!accept(')'))
+            expression();
+        while (accept(',')){
+            expression();
+        }
+        expect(')');
+        return nullptr;
+    }
+}
+
+Node* statement(){
+    Token_Type type;
+    Node* n = nullptr;
+    if (accept('}')){
+        previousToken();
+        return nullptr;
+    }
+
+    if ((type = acceptType()) != TOKEN_UNKOWN){
+        n = assignmentOrExpression(type, true);
+        expect(';');
+        return n;
+    }
+
+    if (accept(TOKEN_IF)){
+        expect('(');
+        Node* e = expression();
         expect(')');
         expect('{');
-        statements();
+        increaseScope();
+        Node* stm1 = statements();
+        decreaseScope();
         expect('}');
         if (accept(TOKEN_ELSE)){
             expect('{');
-            statements();
+            increaseScope();
+            n = makeNode({.type=N_IF, .left=e, .right = makeNode({.type=N_ELSE, .left=stm1, .right=statements()})});
+            decreaseScope();
             expect('}');
+        }else{
+            n = makeNode({.type=N_IF, .left=e, .right = stm1});
         }
-    }else if (accept(TOKEN_FOR)){
+        return n;
+    }
+
+    if (accept(TOKEN_FOR)){
         expect('(');
-        if(acceptType()){
-            expect(TOKEN_ID);
-            expect('=');
-        }else if (accept(TOKEN_ID))
-            expect('=');
-        expression();
-        expect(';');
-        expression();
-        expect(';');
-        expect(TOKEN_ID);
-        expect('=');
-        expression();
+        increaseScope();
+        Node *n1, *n2, *n3;
+        if (!accept(';')){
+            type = acceptType();
+            n1 = assignmentOrExpression(type, true);
+            expect(';');
+        }else{
+            n1 = makeNode({N_EMPTY});
+        }
+        if (!accept(';')){
+            n2 = assignmentOrExpression(TOKEN_UNKOWN,true);
+            expect(';');
+        }
+        else{
+            n2 = makeNode({N_EMPTY});
+        }
+        if (!accept(')')){
+            n3 = assignmentOrExpression(TOKEN_UNKOWN,true);
+            expect(')');
+        }else
+            n3 = makeNode({N_EMPTY});
+
+        expect('{');
+        n = makeNode({.type=N_FOR, .left=
+                      makeNode({.type=N_FOR, .left=
+                      makeNode({.type=N_FOR, .left=n1, .right=n2}), .right=n3}), .right=statements()});
+        decreaseScope();
+        expect('}');
+        return n;
+    }
+
+    if (accept(TOKEN_WHILE)){
+        expect('(');
+        Node* n1 = assignmentOrExpression(TOKEN_UNKOWN,true);
         expect(')');
         expect('{');
-        statements();
+        increaseScope();
+        n = makeNode({.type=N_WHILE, .left=n1, .right=statements()});
+        decreaseScope();
         expect('}');
-    }else if (accept(TOKEN_WHILE)){
-        expect('(');
-        expression();
-        expect(')');
-        expect('{');
-        statements();
-        expect('}');
-    }else if (accept(TOKEN_BREAK))
+        return n;
+    }
+
+    if (accept(TOKEN_BREAK)){
+        n = makeNode({.type=N_BREAK});
         expect(';');
-    else if (accept(TOKEN_CONT))
+        return n;
+    }
+    if(accept(TOKEN_CONT)){
+        n = makeNode({.type=N_CONTINUE});
         expect(';');
-    else if (accept(TOKEN_RETURN))
+        return n;
+    }
+    if (accept(TOKEN_RETURN)){
+        n = makeNode({.type=N_RETURN, .left=expression()});
         expect(';');
-    else
-        return 0;
-    return 1;
+        return n;
+    }
+
+    n = assignmentOrExpression(TOKEN_UNKOWN,true);
+    expect(';');
+    return n;
 }
 
-void statements(){
-    while (statement()){}
+Node* statements(){
+    Node* n1;
+    if ((n1=statement()) != nullptr){
+        return makeNode({.type=N_STMNT, .left=n1, .right=statements()});
+    }
+    return nullptr;
 }
 
-void term(){
-    if (!accept(TOKEN_ID)&&!accept(TOKEN_NUM)&&!accept(TOKEN_STR_LIT)){
+Node* term(){
+    if (accept(TOKEN_ID)){
+        if (accept('(')){
+            previousToken();
+            previousToken();
+            return function(false);
+        }
+        else{
+            msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
+                return makeNode({.type=N_VAR, .var=&p_variables[index]});
+        }
+    }
+    else if (accept(TOKEN_NUM)){
+        if(search_string_first_occurrence(getPreviousToken(1).text,'.').length>0){
+            f64 val = strtod(getPreviousToken(1).text.data, &p_currentToken->text.data);
+            return makeNode({.type=N_FLOAT, .fValue=val});
+        }else{
+            s64 val = strtol(getPreviousToken(1).text.data, &p_currentToken->text.data,10);
+           return makeNode({.type=N_NUM, .sValue=val});
+        }
+    }else if(accept(TOKEN_STR_LIT)){
+        return makeNode({.type=N_STR, .str=getPreviousToken(1).text});
+    }else{
         expect('(');
-        expression();
+        Node* n = expression();
         expect(')');
+        return n;
     }
 }
 
 //these are named after precedence level of treated operators
 //https://en.cppreference.com/w/c/language/operator_precedence
-void exp2(){
-    if (accept('+') || accept('-') || accept('*') || accept('!')){}
-    term();
+Node* exp2(){
+    if (accept('-')){
+        return makeNode({.type=N_NEG,.left=term()});
+    } else if (accept('*')){
+        return makeNode({.type=N_DEREF,.left=term()});
+    } else if (accept('!')){
+        return makeNode({.type=N_NOT,.left=term()});
+    } else {
+        accept('+');
+        return term();
+    }
 }
 
-void exp3(){
-    exp2();
+Node* exp3(){
+    Node* returnVal = exp2();
     while (accept('*') || accept('/') || accept('%'))
-        exp2();
+        returnVal = makeNode({.type=(getPreviousToken(1).type=='*')?N_MUL:
+                              (getPreviousToken(1).type=='/')?N_DIV:N_MOD,
+                              .left=returnVal,.right=exp2()});
+    return returnVal;
 }
 
-void exp4(){
-    exp3();
+Node* exp4(){
+    Node* returnVal = exp3();
     while (accept('+') || accept('-'))
-        exp3();
+        returnVal = makeNode({.type=(getPreviousToken(1).type=='+')?N_ADD:N_SUB,
+                              .left=returnVal,.right=exp3()});
+    return returnVal;
 }
 
-void exp7(){
-    exp4();
+Node* exp7(){
+    Node* returnVal = exp4();
     while (accept(TOKEN_D_EQ) || accept(TOKEN_NOTEQ))
-        exp4();
+        returnVal = makeNode({.type=(getPreviousToken(1).type==TOKEN_D_EQ)?N_EQ:N_NOT_EQ,
+                              .left=returnVal,.right=exp4()});
+    return returnVal;
 }
 
-void exp11(){
-    exp7();
+Node* exp11(){
+    Node* returnVal = exp7();
     while (accept(TOKEN_AND))
-        exp7();
+        returnVal = makeNode({.type=N_AND,.left=returnVal,.right=exp7()});
+    return returnVal;
 }
 
-void expression(){
-    exp11();
+Node* expression(){
+    Node* returnVal = exp11();
     while (accept(TOKEN_OR))
-        exp11();
+        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp11()});
+    returnVal = makeNode({.type=N_EXPR,.left=returnVal,.right=nullptr});
+    return returnVal;
 }
 
-void block(){
-    if (acceptType()){
-        expect(TOKEN_ID);
-        if (accept('='))
-            expression();
+Node* block(){
+    Token_Type t;
+    if ((t = acceptType()) != TOKEN_UNKOWN){
+        Node* node = nullptr;
+        msi pointerLvl = 0;
+        while (accept('*'))
+            pointerLvl++;
+        msi index = expectId(t, pointerLvl);
+        if (accept('=')){
+                node = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.var=&p_variables[index]}),.right=expression()});
+        }
         expect(';');
+        return node;
     }
     else{
-        expect(TOKEN_FN);
-        expect(TOKEN_ID);
-        expect('(');
-        if (acceptType()){
-            expect(TOKEN_ID);
-            while (accept(',')){
-                expectType();
-                expect(TOKEN_ID);
-            }
-        }
-        expect(')');
-        expect(':');
-        expectType(); //no support for void return
-        expect('{');
-        statements();
-        expect('}');
+        return function(true);
     }
 }
 
-void parse(Token* tokens){
-    _tokens = tokens;
-    _currentIndex = -1;
-    _parsing = 1;
-    nextToken();
-    while(_parsing){
-        block();
+Node* program(){
+    if (p_parsing){
+        return makeNode({.type=N_BLOCK, .left=block(), .right=program()});
     }
+    return nullptr;
+}
+void printVar(Variable v){
+    printf("%.*s ", type_to_str(v.dataType));
+    printf("%.*s", v.pointerLvl, "****************");
+    printf("%.*s ", v.name);
+}
+
+void printTree(Node* n, s64 offset){
+    if (n != nullptr){
+        printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
+        if(n->type==N_VAR){
+            printVar(*n->var);
+            printf("\n");
+        }else if(n->type==N_FUNC){
+            printf("%.*s %.*s (", type_to_str(n->type),n->func->name);
+            for (msi i=0;i< ARR_LEN(n->func->arguments);i++)
+                printVar(n->func->arguments[i]);
+            printf(")\n");
+        }else
+            printf("%.*s %u\n", type_to_str(n->type), n->sValue);
+        printTree(n->left, offset+1);
+        printTree(n->right, offset+1);
+    }
+}
+
+struct Parser_Result
+{
+    Node* ast;
+    msi reg_max;
+    
+};
+
+Parser_Result parse(Token* tokens, Heap_Allocator* heap){
+    p_tokens = tokens;
+    p_currentIndex = -1;
+    p_parsing = true;
+    ARR_INIT(p_nodes,64, heap);
+    ARR_INIT(p_variables,64, heap);
+    ARR_INIT(p_variablesInScope,64, heap);
+    ARR_INIT(p_functions,8, heap);
+    p_heap = heap;
+    nextToken();
+    Node* ast = program();
+    printTree(ast, 0);
+    
+    Parser_Result result;
+    result.ast = ast;
+    result.reg_max = ARR_LEN(p_variables) + 10;
+    
+    return result;
 }
