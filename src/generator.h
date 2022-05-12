@@ -445,7 +445,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             break;
         }
-        case N_EQ:
+        case N_CMP_EQ:
         {
             if(res_left.constant && res_right.constant)
             {
@@ -458,11 +458,11 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             break;
         }
-        case N_NOT_EQ:
+        case N_CMP_NEQ:
         {
             if(res_left.constant && res_right.constant)
             {
-                result.value = res_left.value == res_right.value;
+                result.value = res_left.value != res_right.value;
                 result.constant = true;
             }
             else
