@@ -411,25 +411,65 @@ Node* exp4(){
     return returnVal;
 }
 
-Node* exp7(){
+Node* exp6(){
     Node* returnVal = exp4();
+    while (accept(TOKEN_LEQ) || accept(TOKEN_GEQ) || accept('<') || accept('>')){
+        NodeType n;
+        switch (getPreviousToken(1).type) {
+            case '<':
+                n = N_CMP_LT;
+                break;
+            case '>':
+                n = N_CMP_GT;
+                break;
+            case TOKEN_LEQ:
+                n = N_CMP_LEQ;
+                break;
+            case TOKEN_GEQ:
+                n = N_CMP_GEQ;
+                break;
+            default:
+                n = N_EMPTY;
+                IR_INVALID_CASE
+        }
+        returnVal = makeNode({.type=n,.left=returnVal,.right=exp4()});
+    }
+    return returnVal;
+}
+
+Node* exp7(){
+    Node* returnVal = exp6();
     while (accept(TOKEN_D_EQ) || accept(TOKEN_NOTEQ))
-        returnVal = makeNode({.type=(getPreviousToken(1).type==TOKEN_D_EQ)?N_EQ:N_NOT_EQ,
-                              .left=returnVal,.right=exp4()});
+        returnVal = makeNode({.type=(getPreviousToken(1).type==TOKEN_D_EQ)?N_CMP_EQ:N_CMP_NEQ,
+                              .left=returnVal,.right=exp6()});
+    return returnVal;
+}
+
+Node* exp8(){
+    Node* returnVal = exp7();
+    while (accept('&'))
+        returnVal = makeNode({.type=N_AND,.left=returnVal,.right=exp7()});
+    return returnVal;
+}
+
+Node* exp10(){
+    Node* returnVal = exp8();
+    while (accept('|'))
+        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp8()});
     return returnVal;
 }
 
 Node* exp11(){
-    Node* returnVal = exp7();
+    Node* returnVal = exp10();
     while (accept(TOKEN_AND))
-        returnVal = makeNode({.type=N_AND,.left=returnVal,.right=exp7()});
+        returnVal = makeNode({.type=N_CMP_AND,.left=returnVal,.right=exp10()});
     return returnVal;
 }
 
 Node* expression(){
     Node* returnVal = exp11();
     while (accept(TOKEN_OR))
-        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp11()});
+        returnVal = makeNode({.type=N_CMP_OR,.left=returnVal,.right=exp11()});
     returnVal = makeNode({.type=N_EXPR,.left=returnVal,.right=nullptr});
     return returnVal;
 }

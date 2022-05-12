@@ -35,6 +35,8 @@ enum Token_Type
     TOKEN_AND, // &&
     TOKEN_OR, // ||
     TOKEN_NOTEQ, // !=
+    TOKEN_LEQ, // <= TODO
+    TOKEN_GEQ, // >=
     
     /*
        All single charactars are the same value as their ASCII value so A == 'A' == 65

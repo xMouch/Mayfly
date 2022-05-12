@@ -151,6 +151,24 @@ Token* tokenize(String file, Heap_Allocator* heap)
             ARR_PUSH(t.tokens, token);
             continue;     
         }
+
+        if(t.n[0] == '<' && t.n[1] == '=')
+        {
+            token.type = TOKEN_LEQ;
+            adv_chars(&t, 2);
+            token.text.length = 2;
+            ARR_PUSH(t.tokens, token);
+            continue;
+        }
+
+        if(t.n[0] == '>' && t.n[1] == '=')
+        {
+            token.type = TOKEN_GEQ;
+            adv_chars(&t, 2);
+            token.text.length = 2;
+            ARR_PUSH(t.tokens, token);
+            continue;
+        }
         
         switch(t.n[0])
         {
