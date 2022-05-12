@@ -26,8 +26,13 @@ enum Opcodes
     OP_CMP_AND,
     OP_CMP_OR,
     OP_CMP_EQ,
+    OP_CMP_NEQ,
     OP_CMP_LT,
     OP_CMP_GT,
+    
+    //Branch
+    OP_BEQ,
+    OP_BNE,
     
     
     //I_TYPES
@@ -46,19 +51,19 @@ enum Opcodes
     OP_ICMP_AND,
     OP_ICMP_OR,
     OP_ICMP_EQ,
+    OP_ICMP_NEQ,
     OP_ICMP_LT,
     OP_ICMP_GT,
+    
+    
     
     //LOAD/STORE
     OP_LOAD64,
     OP_LOAD8,
     OP_STORE64,
     OP_STORE8,
-
     
-    //Branch
-    OP_BEQ,
-    OP_BNE,
+    
     
     //J_Types
     OP_JMP = 64,
@@ -143,6 +148,7 @@ String opcode_to_str(Opcodes opcode)
         case OP_CMP_AND:  return IR_CONSTZ("OP_CMP_AND");
         case OP_CMP_OR:  return IR_CONSTZ("OP_CMP_OR");
         case OP_CMP_EQ:  return IR_CONSTZ("OP_CMP_EQ");
+        case OP_CMP_NEQ:  return IR_CONSTZ("OP_CMP_NEQ");
         case OP_CMP_LT:  return IR_CONSTZ("OP_CMP_LT");
         case OP_CMP_GT:  return IR_CONSTZ("OP_CMP_GT");
         case OP_IADD:  return IR_CONSTZ("OP_IADD");
@@ -161,6 +167,7 @@ String opcode_to_str(Opcodes opcode)
         case OP_ICMP_AND:  return IR_CONSTZ("OP_ICMP_AND");
         case OP_ICMP_OR:  return IR_CONSTZ("OP_ICMP_OR");
         case OP_ICMP_EQ:  return IR_CONSTZ("OP_ICMP_EQ");
+        case OP_ICMP_NEQ:  return IR_CONSTZ("OP_ICMP_NEQ");
         case OP_ICMP_LT:  return IR_CONSTZ("OP_ICMP_LT");
         case OP_ICMP_GT:  return IR_CONSTZ("OP_ICMP_GT");
         case OP_BEQ:  return IR_CONSTZ("OP_BEQ");
@@ -186,11 +193,11 @@ void print_instr(Instr instr, Metadata* meta)
     //I TYPE
     else if(instr.R.opcode < OP_JMP)
     {
-        fprintf(dst, "%.*s %u %u %u\n", 
+        fprintf(dst, "%.*s %u %u %i\n", 
                 opcode_to_str((Opcodes)instr.I.opcode), 
                 (u32)instr.I.dest,
                 (u32)instr.I.op,
-                (u32)instr.I.imm);
+                (s32)instr.I.imm);
     }
     // J TYPE
     else
@@ -462,6 +469,122 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result = gen_two_op(OP_CMP_EQ, res_left, res_right, meta);   
             }
+            break;
+        }
+        case N_NEG:
+        {
+            if(res_left.constant)
+            {
+                result.value = -res_left.value;
+                result.constant = true;   
+                result.tmp = false;
+            }
+            else
+            {
+                result.tmp = true;
+                result.constant = false;
+                
+                Instr instr={};
+                
+                if(res_left.tmp)
+                {
+                    
+                    instr.I.opcode = OP_IMUL;
+                    instr.I.dest = res_left.value;
+                    instr.I.imm = -1;
+                    instr.I.op = res_left.value;
+                    result.value = res_left.value;
+                }
+                else
+                {
+                    instr.I.opcode = OP_IMUL;
+                    instr.I.dest =  meta->treg_cnt;;
+                    instr.I.imm = -1;
+                    instr.I.op = res_left.value;
+                    
+                    result.value = meta->treg_cnt;
+                    meta->treg_cnt++; 
+                } 
+                print_instr(instr, meta);
+            }
+            break;
+        }  
+        case N_DEREF:
+        {
+            if(res_left.constant)
+            {
+                IR_ASSERT(false && "Cannot dereference a constant!\n")
+            }
+            else
+            {
+                result.tmp = true;
+                result.constant = false;
+                
+                Instr instr={};
+                
+                if(res_left.tmp)
+                {
+                    
+                    instr.I.opcode = OP_LOAD64;
+                    instr.I.dest = res_left.value;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    result.value = res_left.value;
+                }
+                else
+                {
+                    instr.I.opcode = OP_LOAD64;
+                    instr.I.dest =  meta->treg_cnt;;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    
+                    result.value = meta->treg_cnt;
+                    meta->treg_cnt++; 
+                }  
+                
+                print_instr(instr, meta);
+            }
+            
+            break;
+        }
+        case N_NOT:
+        {
+            if(res_left.constant)
+            {
+                result.value = !res_left.value;
+                result.constant = true;   
+                result.tmp = false;
+            }
+            else
+            {
+                result.tmp = true;
+                result.constant = false;
+                
+                Instr instr={};
+                
+                if(res_left.tmp)
+                {
+                    
+                    instr.I.opcode = OP_ICMP_NEQ;
+                    instr.I.dest = res_left.value;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    result.value = res_left.value;
+                }
+                else
+                {
+                    instr.I.opcode = OP_ICMP_NEQ;
+                    instr.I.dest =  meta->treg_cnt;;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    
+                    result.value = meta->treg_cnt;
+                    meta->treg_cnt++; 
+                }  
+                
+                print_instr(instr, meta);
+            }
+            
             break;
         }
         

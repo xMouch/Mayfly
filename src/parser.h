@@ -103,7 +103,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
         Variable v{};
         v.level = p_currentScope;
         v.dataType = declarationType;
-        v.id = ARR_LEN(p_variables)+10;
+        v.id = ARR_LEN(p_variables);
         v.name = t.text;
         v.pointerLvl = pointerLvl;
         ARR_PUSH(p_variables,v);
@@ -505,7 +505,12 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     
     Parser_Result result;
     result.ast = ast;
-    result.reg_max = ARR_LEN(p_variables) + 10;
+    result.reg_max = ARR_LEN(p_variables)+10;
+    
+    for(msi i = 0; i < ARR_LEN(p_variables); ++i)
+    {
+        p_variables[i].id +=10; 
+    }
     
     return result;
 }

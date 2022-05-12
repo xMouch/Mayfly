@@ -7,9 +7,12 @@ fn main(s64 argc, s64* argv) : s64
 	s64 test_var;
 	test_var = 25;
 
-	s64 test_var2 = 7;
+	s64 test_var2 = (5 + 12 - 2)/3;
 	
 	s64 test_var3 = test_var + test_var2; //30
+
+    s64 test_var4 = !(test_var3/10);
+    s64 neg_var = -test_var2;
 	
 	//c8* test = "Hi my name is What";
 
