@@ -453,10 +453,17 @@ Node* exp8(){
     return returnVal;
 }
 
-Node* exp10(){
+Node* exp9(){
     Node* returnVal = exp8();
+    while (accept('^'))
+        returnVal = makeNode({.type=N_XOR,.left=returnVal,.right=exp8()});
+    return returnVal;
+}
+
+Node* exp10(){
+    Node* returnVal = exp9();
     while (accept('|'))
-        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp8()});
+        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp9()});
     return returnVal;
 }
 
