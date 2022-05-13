@@ -4,6 +4,7 @@
 struct Tokenizer
 {
     String file;
+    String line_text;
     Token* tokens;
     c8  n[2];
     msi cur;
@@ -51,6 +52,19 @@ void adv_chars(Tokenizer* t, msi count)
         {
             ++t->cur_line;
             t->cur_column = 1;
+            
+            msi begin = 1;
+            for(;is_whitespace(t->file.data[t->cur+begin]);++begin)
+            {}
+            
+            t->line_text.data = &t->file.data[t->cur+begin];
+            
+            msi i = 0;
+            for(; !is_end_of_line(t->line_text.data[i]); ++i)
+            {}
+            
+            t->line_text.length = i+1;
+            
         }
         ++t->cur;
         
@@ -114,6 +128,7 @@ Token* tokenize(String file, Heap_Allocator* heap)
         token.text.length = 1;
         token.line = t.cur_line;
         token.column = t.cur_column;
+        token.line_text = t.line_text;
         
         
         if(t.n[0] == '=' && t.n[1] == '=')
@@ -194,6 +209,7 @@ Token* tokenize(String file, Heap_Allocator* heap)
             case '#':
             case '&':
             case '|':
+            case '^':
             {
                 token.type = (Token_Type)t.n[0];
                 adv_chars(&t, 1);

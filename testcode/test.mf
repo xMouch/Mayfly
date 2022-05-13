@@ -18,6 +18,11 @@ fn main(s64 argc, s64* argv) : s64
 	
 	//c8* test = "Hi my name is What";
 
+    for(s64 i = 0; i < test_var3; i = i+1)
+    {
+        test_var2 = test_var2 + 33;
+    }
+
    	if(test_var == 25)
 	{
 		return test_var3 + 20; //50

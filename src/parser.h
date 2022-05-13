@@ -16,6 +16,7 @@ msi p_currentScope;
 Function* p_functions;
 
 Node* makeNode(Node newNode){
+    newNode.line_text = p_currentToken->line_text;
     ARR_PUSH(p_nodes, newNode);
     return ARR_LAST(p_nodes);
 }

@@ -7,6 +7,28 @@
 
 
 
+
+/*
+First 10 registers are reserved:
+
+0 .. zero reg
+1 .. program counter
+2 .. return addr
+3 .. return reg
+4 .. frame_ptr
+5 .. stack_ptr
+*/
+
+enum Registers
+{
+    R_ZERO=0,
+    R_PROG_CNT,
+    R_RETURN_ADDR,
+    R_RETURN,
+    R_FRAME_PTR,
+    R_STACK_PTR,  
+};
+
 enum Opcodes
 {
     //R_TYPES
@@ -30,10 +52,6 @@ enum Opcodes
     OP_CMP_LT,
     OP_CMP_GT,
     
-    //Branch
-    OP_BEQ,
-    OP_BNE,
-    
     
     //I_TYPES
     //INTEGER
@@ -56,6 +74,10 @@ enum Opcodes
     OP_ICMP_GT,
     
     
+    //Branch
+    OP_BEQ,
+    OP_BNE,
+    
     
     //LOAD/STORE
     OP_LOAD64,
@@ -67,6 +89,7 @@ enum Opcodes
     
     //J_Types
     OP_JMP = 64,
+    OP_JMPR,
     
     /*
     //STACK
@@ -126,6 +149,9 @@ struct Metadata
     Meta_Function* funcs;
     Meta_Variable* var;
     
+    Instr* instr_list; 
+    String* line_to_instr_list;
+    
     Meta_Function* cur_func;
     msi cur_line;
     msi treg_cnt;
@@ -173,41 +199,63 @@ String opcode_to_str(Opcodes opcode)
         case OP_BEQ:  return IR_CONSTZ("OP_BEQ");
         case OP_BNE:  return IR_CONSTZ("OP_BNE");
         case OP_JMP:  return IR_CONSTZ("OP_JMP");
+        case OP_JMPR:  return IR_CONSTZ("OP_JMPR");
         default: return IR_CONSTZ("OPCODE PRINT NOT IMPLEMENTED");
     }
 }
 
 static
-void print_instr(Instr instr, Metadata* meta)
+void print_all_instr(Metadata* meta)
 {
     static FILE* dst = stdout;
-    // R TYPE
-    if(instr.R.opcode < OP_IADD)
-    {
-        fprintf(dst, "%.*s %u %u %u\n", 
-                opcode_to_str((Opcodes)instr.R.opcode), 
-                (u32)instr.R.dest,
-                (u32)instr.R.op1,
-                (u32)instr.R.op2);
-    }
-    //I TYPE
-    else if(instr.R.opcode < OP_JMP)
-    {
-        fprintf(dst, "%.*s %u %u %i\n", 
-                opcode_to_str((Opcodes)instr.I.opcode), 
-                (u32)instr.I.dest,
-                (u32)instr.I.op,
-                (s32)instr.I.imm);
-    }
-    // J TYPE
-    else
-    {
-        fprintf(dst, "%.*s %llu\n", 
-                opcode_to_str((Opcodes)instr.J.opcode), 
-                (u64)instr.J.jmp);
-    }
+    
+    String prev_line = {};// meta->line_to_instr_list[0];
     
     
+    for(msi i = 0; i < ARR_LEN(meta->instr_list); ++i)
+    {
+        Instr instr = meta->instr_list[i];
+        
+        if(prev_line.data != meta->line_to_instr_list[i].data)
+        { 
+            prev_line = meta->line_to_instr_list[i];
+            fprintf(dst, "\033[32m%.*s\033[37m", prev_line);
+        }
+        
+        // R TYPE
+        if(instr.R.opcode < OP_IADD)
+        {
+            fprintf(dst, "  %.*s %u %u %u\n", 
+                    opcode_to_str((Opcodes)instr.R.opcode), 
+                    (u32)instr.R.dest,
+                    (u32)instr.R.op1,
+                    (u32)instr.R.op2);
+        }
+        //I TYPE
+        else if(instr.R.opcode < OP_JMP)
+        {
+            fprintf(dst, "  %.*s %u %u %i\n", 
+                    opcode_to_str((Opcodes)instr.I.opcode), 
+                    (u32)instr.I.dest,
+                    (u32)instr.I.op,
+                    (s32)instr.I.imm);
+        }
+        // J TYPE
+        else
+        {
+            fprintf(dst, "  %.*s %llu\n", 
+                    opcode_to_str((Opcodes)instr.J.opcode), 
+                    (u64)instr.J.jmp);
+        } 
+    }
+}
+
+static
+void add_instr(Instr instr, String cur_line, Metadata* meta)
+{
+    
+    ARR_PUSH(meta->line_to_instr_list, cur_line);
+    ARR_PUSH(meta->instr_list, instr);
     meta->cur_line++;
 }
 
@@ -244,7 +292,7 @@ struct Expr_Result
 };
 
 static
-Expr_Result gen_two_op(Opcodes opcode, Expr_Result left, Expr_Result right, Metadata* meta)
+Expr_Result gen_two_op(Opcodes opcode, Expr_Result left, Expr_Result right, String cur_line, Metadata* meta)
 {
     
     Expr_Result result = {};
@@ -315,7 +363,7 @@ Expr_Result gen_two_op(Opcodes opcode, Expr_Result left, Expr_Result right, Meta
     result.tmp = true;
     result.constant = false;
     
-    print_instr(instr, meta);
+    add_instr(instr, cur_line, meta);
     
     return result;
 }
@@ -363,7 +411,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_ADD, res_left, res_right, meta);   
+                result = gen_two_op(OP_ADD, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -376,7 +424,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_SUB, res_left, res_right, meta);   
+                result = gen_two_op(OP_SUB, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -389,7 +437,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_MUL, res_left, res_right, meta);   
+                result = gen_two_op(OP_MUL, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -402,7 +450,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_DIV, res_left, res_right, meta);   
+                result = gen_two_op(OP_DIV, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -415,7 +463,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_MOD, res_left, res_right, meta);   
+                result = gen_two_op(OP_MOD, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -423,12 +471,12 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
         {
             if(res_left.constant && res_right.constant)
             {
-                result.value = res_left.value && res_right.value;
+                result.value = res_left.value & res_right.value;
                 result.constant = true;
             }
             else
             {
-                result = gen_two_op(OP_AND, res_left, res_right, meta);   
+                result = gen_two_op(OP_AND, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -436,12 +484,12 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
         {
             if(res_left.constant && res_right.constant)
             {
-                result.value = res_left.value || res_right.value;
+                result.value = res_left.value | res_right.value;
                 result.constant = true;
             }
             else
             {
-                result = gen_two_op(OP_OR, res_left, res_right, meta);   
+                result = gen_two_op(OP_OR, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -454,7 +502,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_CMP_EQ, res_left, res_right, meta);   
+                result = gen_two_op(OP_CMP_EQ, res_left, res_right, node->line_text, meta);   
             }
             break;
         }
@@ -467,7 +515,97 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_CMP_EQ, res_left, res_right, meta);   
+                result = gen_two_op(OP_CMP_NEQ, res_left, res_right, node->line_text, meta);   
+            }
+            break;
+        }
+        case N_CMP_AND:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value && res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_AND, res_left, res_right, node->line_text, meta);   
+            }
+            break;
+        }
+        case N_CMP_OR:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value || res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_OR, res_left, res_right, node->line_text, meta);   
+            }
+            break;
+        }
+        case N_CMP_LT:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value < res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta);   
+            }
+            break;
+        }
+        case N_CMP_GT:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value > res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta);   
+            }
+            break;
+        }
+        case N_CMP_LEQ:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value <= res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
+                Instr instr={};
+                instr.I.opcode = OP_ICMP_NEQ;
+                instr.I.dest = result.value;
+                instr.I.imm = 0;
+                instr.I.op = result.value;
+                add_instr(instr, node->line_text, meta);
+            }
+            break;
+        }
+        case N_CMP_GEQ:
+        {
+            if(res_left.constant && res_right.constant)
+            {
+                result.value = res_left.value >= res_right.value;
+                result.constant = true;
+            }
+            else
+            {
+                result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
+                Instr instr={};
+                instr.I.opcode = OP_ICMP_NEQ;
+                instr.I.dest = result.value;
+                instr.I.imm = 0;
+                instr.I.op = result.value;
+                add_instr(instr, node->line_text, meta);
             }
             break;
         }
@@ -505,7 +643,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     result.value = meta->treg_cnt;
                     meta->treg_cnt++; 
                 } 
-                print_instr(instr, meta);
+                add_instr(instr, node->line_text, meta);
             }
             break;
         }  
@@ -542,7 +680,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     meta->treg_cnt++; 
                 }  
                 
-                print_instr(instr, meta);
+                add_instr(instr, node->line_text, meta);
             }
             
             break;
@@ -582,7 +720,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     meta->treg_cnt++; 
                 }  
                 
-                print_instr(instr, meta);
+                add_instr(instr, node->line_text, meta);
             }
             
             break;
@@ -611,7 +749,7 @@ void gen_assign(Node* node, Metadata* meta)
     {
         instr.I.opcode = OP_IADD;
         instr.I.dest = node->left->var->id;
-        instr.I.op = 0;
+        instr.I.op = R_ZERO;
         instr.I.imm = expr_result.value;
         instr.I.shift = 0;
         
@@ -621,12 +759,174 @@ void gen_assign(Node* node, Metadata* meta)
         instr.R.opcode = OP_ADD;
         instr.R.dest = node->left->var->id;
         instr.R.op1 = expr_result.value;
-        instr.R.op2 = 0;
+        instr.R.op2 = R_ZERO;
         instr.R.shift = 0;
         
     }
     
-    print_instr(instr, meta);
+    add_instr(instr, node->line_text, meta);
+}
+
+static 
+void gen_if(Node* node, Metadata* meta)
+{
+    IR_ASSERT(node->left->type == N_EXPR);
+    
+    Expr_Result expr_res = gen_expr(node->left, meta);
+    
+    if(expr_res.constant)
+    {
+        if(expr_res.value)
+        {
+            if(node->right->type == N_ELSE)
+            {
+                gen_node(node->right->left, meta);   
+            }
+            else
+            {
+                gen_node(node->right, meta); 
+            }
+        }
+        else
+        {
+            if(node->right->type == N_ELSE)
+            {
+                gen_node(node->right->right, meta);   
+            }
+            else
+            {
+                //gen_node(node->right, meta); 
+            } 
+        }
+    }
+    else
+    {
+        msi branch_index = meta->cur_line;
+        
+        Instr b_instr = {};
+        b_instr.I.opcode = OP_BEQ;
+        b_instr.I.dest = R_ZERO;
+        b_instr.I.op = expr_res.value;  
+        b_instr.I.imm = 0;
+        b_instr.I.shift = 0;
+        
+        add_instr(b_instr, node->line_text, meta);
+        
+        if(node->right->type == N_ELSE)
+        {
+            gen_node(node->right->left, meta);
+            
+            meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
+            
+            gen_node(node->right->right, meta);
+        }
+        else
+        {
+            gen_node(node->right, meta);
+            
+            meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
+        }
+        
+    }
+}
+
+static
+void gen_return(Node* node, Metadata* meta)
+{
+    IR_ASSERT(node->left->type == N_EXPR);
+    Expr_Result expr_res = gen_expr(node->left, meta);
+    
+    Instr instr = {};
+    if(expr_res.constant)
+    {
+        instr.I.opcode = OP_IADD;
+        instr.I.dest = R_RETURN;
+        instr.I.op = R_ZERO;
+        instr.I.imm = expr_res.value;
+        instr.I.shift = 0;
+        
+    }
+    else
+    {
+        instr.R.opcode = OP_ADD;
+        instr.R.dest = R_RETURN;
+        instr.R.op1 = expr_res.value;
+        instr.R.op2 = R_ZERO;
+        instr.R.shift = 0;
+        
+    }
+    add_instr(instr, node->line_text, meta);
+    
+    instr = {};
+    instr.J.opcode = OP_JMPR;
+    instr.J.jmp = R_RETURN_ADDR;
+    
+    add_instr(instr, node->line_text, meta);
+    
+    
+}
+
+static
+void gen_for(Node* node, Metadata* meta)
+{
+    IR_ASSERT(node->left->type == N_FOR && node->left->left->type == N_FOR);
+    
+    gen_node(node->left->left->left, meta);
+    
+    msi for_start_index = meta->cur_line;
+    msi branch_index = (msi)-1;
+    
+    if(node->left->left->right->type == N_EXPR)
+    {
+        Expr_Result expr_res = gen_expr(node->left->left->right, meta);
+        
+        if(expr_res.constant)
+        {
+            if(!expr_res.value)
+            {
+                return;   
+            }
+        }
+        else
+        {
+            branch_index = meta->cur_line;
+            
+            Instr b_instr = {};
+            b_instr.I.opcode = OP_BEQ;
+            b_instr.I.dest = R_ZERO;
+            b_instr.I.op = expr_res.value;  
+            b_instr.I.imm = 0;
+            b_instr.I.shift = 0;  
+            
+            add_instr(b_instr, node->line_text, meta);
+        }
+        
+    }
+    else
+    {
+        gen_node(node->left->left->right, meta);
+    }
+    
+    
+    gen_node(node->right, meta);
+    
+    gen_node(node->left->right, meta);
+    
+    Instr instr = {};
+    instr = {};
+    instr.J.opcode = OP_JMP;
+    instr.J.jmp = for_start_index;
+    
+    
+    add_instr(instr, node->line_text, meta);
+    
+    
+    if(branch_index != (msi)-1)
+    {
+        meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
+    }
+    
+    
 }
 
 static
@@ -644,6 +944,21 @@ void gen_node(Node* node, Metadata* meta)
         {
             gen_assign(node, meta);
             break;
+        }
+        case N_IF:
+        {
+            gen_if(node, meta);
+            break;   
+        }
+        case N_RETURN:
+        {
+            gen_return(node, meta);
+            break;   
+        }
+        case N_FOR:
+        {
+            gen_for(node, meta);
+            break;   
         }
         case N_STMNT:
         case N_BLOCK:
@@ -673,11 +988,15 @@ void generate(Node* ast, msi reg_max, Heap_Allocator* heap)
     meta.treg_cnt = reg_max;
     ARR_INIT(meta.funcs, 64, heap);
     ARR_INIT(meta.var, 64, heap);
+    ARR_INIT(meta.instr_list, 128, heap);
+    ARR_INIT(meta.line_to_instr_list, 128, heap);
     
     if(ast)
     {
         gen_node(ast, &meta);
     }
+    
+    print_all_instr(&meta);
     
 }
 

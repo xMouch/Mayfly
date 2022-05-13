@@ -60,6 +60,7 @@ struct Function{
 
 struct Node{
     NodeType type;
+    String line_text;
     union{
         s64 sValue;
         f64 fValue;
