@@ -194,6 +194,7 @@ Token* tokenize(String file, Heap_Allocator* heap)
             case '#':
             case '&':
             case '|':
+            case '^':
             {
                 token.type = (Token_Type)t.n[0];
                 adv_chars(&t, 1);
