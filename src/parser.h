@@ -15,8 +15,10 @@ msi p_currentScope;
 
 Function* p_functions;
 
-Node* makeNode(Node newNode){
-    newNode.line_text = p_currentToken->line_text;
+Token getPreviousToken(msi howFarBack);
+
+Node* makeNode(Node newNode, s64 textOffset = 0){
+    newNode.line_text = getPreviousToken(textOffset).line_text;
     ARR_PUSH(p_nodes, newNode);
     return ARR_LAST(p_nodes);
 }
@@ -244,6 +246,14 @@ Node* function(b8 declaration){
 Node* statement(){
     Token_Type type;
     Node* n = nullptr;
+    if (accept('{')){
+        increaseScope();
+        n = statements();
+        decreaseScope();
+        expect('}');
+        return n;
+    }
+
     if (accept('}')){
         previousToken();
         return nullptr;
@@ -256,6 +266,7 @@ Node* statement(){
     }
 
     if (accept(TOKEN_IF)){
+        s64 ifIndex = p_currentIndex;
         expect('(');
         Node* e = expression();
         expect(')');
@@ -265,18 +276,22 @@ Node* statement(){
         decreaseScope();
         expect('}');
         if (accept(TOKEN_ELSE)){
+            s64 elseIndex = p_currentIndex;
             expect('{');
             increaseScope();
-            n = makeNode({.type=N_IF, .left=e, .right = makeNode({.type=N_ELSE, .left=stm1, .right=statements()})});
+            n = makeNode({.type=N_IF, .left=e, .right =
+                          makeNode({.type=N_ELSE, .left=stm1, .right=statements()}, elseIndex - p_currentIndex)},
+                         ifIndex - p_currentIndex);
             decreaseScope();
             expect('}');
         }else{
-            n = makeNode({.type=N_IF, .left=e, .right = stm1});
+            n = makeNode({.type=N_IF, .left=e, .right = stm1}, ifIndex - p_currentIndex);
         }
         return n;
     }
 
     if (accept(TOKEN_FOR)){
+        s64 forIndex = p_currentIndex;
         expect('(');
         increaseScope();
         Node *n1, *n2, *n3;
@@ -303,19 +318,21 @@ Node* statement(){
         expect('{');
         n = makeNode({.type=N_FOR, .left=
                       makeNode({.type=N_FOR, .left=
-                      makeNode({.type=N_FOR, .left=n1, .right=n2}), .right=n3}), .right=statements()});
+                      makeNode({.type=N_FOR, .left=n1, .right=n2}, forIndex - p_currentIndex), .right=n3},
+                               forIndex - p_currentIndex), .right=statements()},forIndex - p_currentIndex);
         decreaseScope();
         expect('}');
         return n;
     }
 
     if (accept(TOKEN_WHILE)){
+        s64 whileIndex = p_currentIndex;
         expect('(');
         Node* n1 = assignmentOrExpression(TOKEN_UNKOWN,true);
         expect(')');
         expect('{');
         increaseScope();
-        n = makeNode({.type=N_WHILE, .left=n1, .right=statements()});
+        n = makeNode({.type=N_WHILE, .left=n1, .right=statements()}, whileIndex - p_currentIndex);
         decreaseScope();
         expect('}');
         return n;
