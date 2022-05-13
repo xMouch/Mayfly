@@ -40,18 +40,17 @@ int main(s32 argc, c8** argv)
     
     Token* tokens = tokenize(file, &heap);
     
-    
+    /*
     for(msi i = 0; i < ARR_LEN(tokens); ++i)
     {
-        //fprintf(stdout, "Type: %.*s, '%.*s'  Line: %llu  Column: %llu\n", type_to_str(tokens[i].type), tokens[i].text, tokens[i].line, tokens[i].column);
-        fprintf(stdout, "%.*s", tokens[i].line_text);
+        fprintf(stdout, "Type: %.*s, '%.*s'  Line: %llu  Column: %llu\n", type_to_str(tokens[i].type), tokens[i].text, tokens[i].line, tokens[i].column);
+    //    fprintf(stdout, "%.*s", tokens[i].line_text);
     }
+*/
 
     Parser_Result parser_result = parse(tokens, &heap);
     
     generate(parser_result.ast, parser_result.reg_max, &heap);
-    
-    printf("SIZE Opcodes: %u\n", sizeof(Opcodes));
     
     return 0;
 }
