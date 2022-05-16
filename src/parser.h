@@ -18,7 +18,7 @@ Function* p_functions;
 Token getPreviousToken(msi howFarBack);
 
 Node* makeNode(Node newNode, s64 textOffset = 0){
-    newNode.line_text = getPreviousToken(textOffset).line_text;
+    newNode.line_text = getPreviousToken(-textOffset).line_text;
     ARR_PUSH(p_nodes, newNode);
     return ARR_LAST(p_nodes);
 }
