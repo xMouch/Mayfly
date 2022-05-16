@@ -143,6 +143,12 @@ struct Meta_Variable
     //b8 on_stack;
 };
 
+struct Meta_Loop_Manip
+{
+    b8 is_break;
+    msi loop_id;
+    msi line;
+};
 
 struct Metadata
 {
@@ -152,9 +158,14 @@ struct Metadata
     Instr* instr_list; 
     String* line_to_instr_list;
     
+    
+    
+    Meta_Loop_Manip* loop_manips;
+    
     Meta_Function* cur_func;
     msi cur_line;
     msi treg_cnt;
+    msi cur_loop_id;
 };
 
 static
@@ -219,7 +230,7 @@ void print_all_instr(Metadata* meta)
         if(prev_line.data != meta->line_to_instr_list[i].data)
         { 
             prev_line = meta->line_to_instr_list[i];
-            fprintf(dst, "\033[32m%.*s\033[37m", prev_line);
+            fprintf(dst, "\033[32m%.*s\033[97m", prev_line);
         }
         
         // R TYPE
@@ -871,6 +882,9 @@ void gen_for(Node* node, Metadata* meta)
 {
     IR_ASSERT(node->left->type == N_FOR && node->left->left->type == N_FOR);
     
+    
+    meta->cur_loop_id++;
+    
     gen_node(node->left->left->left, meta);
     
     msi for_start_index = meta->cur_line;
@@ -884,6 +898,8 @@ void gen_for(Node* node, Metadata* meta)
         {
             if(!expr_res.value)
             {
+                
+                meta->cur_loop_id--;
                 return;   
             }
         }
@@ -927,6 +943,139 @@ void gen_for(Node* node, Metadata* meta)
     }
     
     
+    for(msi i = ARR_LEN(meta->loop_manips) -1; i >= 0 ; --i)
+    {
+        Meta_Loop_Manip manip = meta->loop_manips[i];
+        
+        if(manip.loop_id != meta->cur_loop_id)
+        {
+            break;   
+        }
+        
+        if(manip.is_break)
+        {
+            meta->instr_list[manip.line].J.jmp = meta->cur_line;   
+        }
+        else
+        {
+            meta->instr_list[manip.line].J.jmp = for_start_index;
+        }
+        
+        ARR_POP(meta->loop_manips);
+    }
+    
+    meta->cur_loop_id--;
+}
+
+static
+void gen_while(Node* node, Metadata* meta)
+{
+    IR_ASSERT(node->left->type == N_EXPR);
+    
+    meta->cur_loop_id++;
+    
+    msi while_start_index = meta->cur_line;
+    msi branch_index = (msi)-1;
+    
+    Expr_Result expr_res = gen_expr(node->left, meta);
+    
+    if(expr_res.constant)
+    {
+        if(!expr_res.value)
+        {
+            
+            meta->cur_loop_id--;
+            return;   
+        }
+    }
+    else
+    {
+        branch_index = meta->cur_line;
+        
+        Instr b_instr = {};
+        b_instr.I.opcode = OP_BEQ;
+        b_instr.I.dest = R_ZERO;
+        b_instr.I.op = expr_res.value;  
+        b_instr.I.imm = 0;
+        b_instr.I.shift = 0;  
+        
+        add_instr(b_instr, node->line_text, meta);
+    }
+    
+    gen_node(node->right, meta);
+    
+    Instr instr = {};
+    instr = {};
+    instr.J.opcode = OP_JMP;
+    instr.J.jmp = while_start_index;
+    
+    
+    add_instr(instr, node->line_text, meta);
+    
+    
+    if(branch_index != (msi)-1)
+    {
+        meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
+    }
+    
+    
+    for(msi i = ARR_LEN(meta->loop_manips) -1; i >= 0 ; --i)
+    {
+        Meta_Loop_Manip manip = meta->loop_manips[i];
+        
+        if(manip.loop_id != meta->cur_loop_id)
+        {
+            break;   
+        }
+        
+        if(manip.is_break)
+        {
+            meta->instr_list[manip.line].J.jmp = meta->cur_line;   
+        }
+        else
+        {
+            meta->instr_list[manip.line].J.jmp = while_start_index;
+        }
+        
+        ARR_POP(meta->loop_manips);
+    }
+    
+    meta->cur_loop_id--;
+    
+}
+
+void gen_break(Node* node, Metadata* meta)
+{
+    Instr instr = {};
+    instr = {};
+    instr.J.opcode = OP_JMP;
+    instr.J.jmp = 0;
+    
+    Meta_Loop_Manip loop_manip = {};
+    loop_manip.is_break = true;
+    loop_manip.loop_id = meta->cur_loop_id;
+    loop_manip.line = meta->cur_line;
+    
+    ARR_PUSH(meta->loop_manips, loop_manip);
+    
+    add_instr(instr, node->line_text, meta);
+}
+
+void gen_continue(Node* node, Metadata* meta)
+{
+    Instr instr = {};
+    instr = {};
+    instr.J.opcode = OP_JMP;
+    instr.J.jmp = 0;
+    
+    Meta_Loop_Manip loop_manip = {};
+    loop_manip.is_break = false;
+    loop_manip.loop_id = meta->cur_loop_id;
+    loop_manip.line = meta->cur_line;
+    
+    ARR_PUSH(meta->loop_manips, loop_manip);
+    
+    add_instr(instr, node->line_text, meta);
 }
 
 static
@@ -960,6 +1109,21 @@ void gen_node(Node* node, Metadata* meta)
             gen_for(node, meta);
             break;   
         }
+        case N_WHILE:
+        {
+            gen_while(node, meta);
+            break;   
+        }
+        case N_BREAK:
+        {
+            gen_break(node, meta);
+            break;   
+        }
+        case N_CONTINUE:
+        {
+            gen_continue(node, meta);
+            break;   
+        }
         case N_STMNT:
         case N_BLOCK:
         case N_EMPTY:
@@ -990,6 +1154,7 @@ void generate(Node* ast, msi reg_max, Heap_Allocator* heap)
     ARR_INIT(meta.var, 64, heap);
     ARR_INIT(meta.instr_list, 128, heap);
     ARR_INIT(meta.line_to_instr_list, 128, heap);
+    ARR_INIT(meta.loop_manips, 16, heap);
     
     if(ast)
     {

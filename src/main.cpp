@@ -28,9 +28,9 @@ String read_entire_file(c8* file_name, Memory_Arena* arena)
 int main(s32 argc, c8** argv)
 {
     Memory_Arena arena = create_memory_arena(IR_MEGABYTES(256), (u8*)malloc(IR_MEGABYTES(256)));
-
+    
     String file;
-
+    
     if (argc > 1){
         file = read_entire_file(argv[1], &arena);
     }else
@@ -46,8 +46,8 @@ int main(s32 argc, c8** argv)
         fprintf(stdout, "Type: %.*s, '%.*s'  Line: %llu  Column: %llu\n", type_to_str(tokens[i].type), tokens[i].text, tokens[i].line, tokens[i].column);
     //    fprintf(stdout, "%.*s", tokens[i].line_text);
     }
-*/
-
+    */
+    
     Parser_Result parser_result = parse(tokens, &heap);
     
     generate(parser_result.ast, parser_result.reg_max, &heap);

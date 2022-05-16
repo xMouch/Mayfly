@@ -23,6 +23,13 @@ fn main(s64 argc, s64* argv) : s64
         test_var2 = test_var2 + 33;
     }
 
+
+
+    while(test_var3 > 0)
+    {
+        test_var3 = test_var3 -1;
+    }
+
    	if(test_var == 25)
 	{
 		return test_var3 + 20; //50
