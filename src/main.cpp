@@ -25,9 +25,12 @@ String read_entire_file(c8* file_name, Memory_Arena* arena)
     return result;
 }
 
+
+
+
 int main(s32 argc, c8** argv)
 {
-    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(256), (u8*)malloc(IR_MEGABYTES(256)));
+    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(512), (u8*)malloc(IR_MEGABYTES(512)));
     
     String file;
     
@@ -36,7 +39,7 @@ int main(s32 argc, c8** argv)
     }else
         file = read_entire_file("testcode/test.mf", &arena);
     
-    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(64), 0);
+    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(256), 0);
     
     Token* tokens = tokenize(file, &heap);
     
@@ -50,7 +53,10 @@ int main(s32 argc, c8** argv)
     
     Parser_Result parser_result = parse(tokens, &heap);
     
-    generate(parser_result.ast, parser_result.reg_max, &heap);
+    Metadata meta = generate(parser_result.ast, parser_result.reg_max, &heap);
+    
+    
+    generate_binary("binary.mayfly", &meta);
     
     return 0;
 }

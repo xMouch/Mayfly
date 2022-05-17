@@ -1,6 +1,8 @@
 #ifndef GENERATOR_H
 #define GENERATOR_H
 
+#include "tokens.h"
+#include "tokenizer.h"
 #include "nodes.h"
 
 #pragma pack(push, 1)
@@ -236,7 +238,8 @@ void print_all_instr(Metadata* meta)
         // R TYPE
         if(instr.R.opcode < OP_IADD)
         {
-            fprintf(dst, "  %.*s %u %u %u\n", 
+            fprintf(dst, "%llu:  %.*s %u %u %u\n", 
+                    i,
                     opcode_to_str((Opcodes)instr.R.opcode), 
                     (u32)instr.R.dest,
                     (u32)instr.R.op1,
@@ -245,7 +248,8 @@ void print_all_instr(Metadata* meta)
         //I TYPE
         else if(instr.R.opcode < OP_JMP)
         {
-            fprintf(dst, "  %.*s %u %u %i\n", 
+            fprintf(dst, "%llu:  %.*s %u %u %i\n",
+                    i,
                     opcode_to_str((Opcodes)instr.I.opcode), 
                     (u32)instr.I.dest,
                     (u32)instr.I.op,
@@ -254,11 +258,27 @@ void print_all_instr(Metadata* meta)
         // J TYPE
         else
         {
-            fprintf(dst, "  %.*s %llu\n", 
+            fprintf(dst, "%llu:  %.*s %llu\n", 
+                    i,
                     opcode_to_str((Opcodes)instr.J.opcode), 
                     (u64)instr.J.jmp);
         } 
     }
+}
+
+static
+void generate_binary(c8* binary_loc, Metadata* meta)
+{
+    FILE* bin_file;
+    bin_file = fopen(binary_loc, "wb");
+    msi result = fwrite(&meta->instr_list[0], sizeof(Instr) * ARR_LEN(meta->instr_list), 1, bin_file);
+    
+    if(!result)
+    {
+        fprintf(stderr, "Error writing binary file!\n");
+    }
+    
+    fclose(bin_file);
 }
 
 static
@@ -714,7 +734,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 if(res_left.tmp)
                 {
                     
-                    instr.I.opcode = OP_ICMP_NEQ;
+                    instr.I.opcode = OP_ICMP_EQ;
                     instr.I.dest = res_left.value;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
@@ -722,7 +742,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 }
                 else
                 {
-                    instr.I.opcode = OP_ICMP_NEQ;
+                    instr.I.opcode = OP_ICMP_EQ;
                     instr.I.dest =  meta->treg_cnt;;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
@@ -926,6 +946,8 @@ void gen_for(Node* node, Metadata* meta)
     
     gen_node(node->right, meta);
     
+    msi break_jmp_loc = meta->cur_line;
+    
     gen_node(node->left->right, meta);
     
     Instr instr = {};
@@ -958,7 +980,7 @@ void gen_for(Node* node, Metadata* meta)
         }
         else
         {
-            meta->instr_list[manip.line].J.jmp = for_start_index;
+            meta->instr_list[manip.line].J.jmp = break_jmp_loc;
         }
         
         ARR_POP(meta->loop_manips);
@@ -1146,7 +1168,7 @@ void gen_node(Node* node, Metadata* meta)
 }
 
 static 
-void generate(Node* ast, msi reg_max, Heap_Allocator* heap)
+Metadata generate(Node* ast, msi reg_max, Heap_Allocator* heap)
 {
     Metadata meta = {};
     meta.treg_cnt = reg_max;
@@ -1163,6 +1185,7 @@ void generate(Node* ast, msi reg_max, Heap_Allocator* heap)
     
     print_all_instr(&meta);
     
+    return meta;
 }
 
 

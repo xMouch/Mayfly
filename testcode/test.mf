@@ -10,27 +10,29 @@ fn main(s64 argc, s64* argv) : s64
 	s64 test_var2 = (5 + 12 - 2)/3;
 	
 	s64 test_var3 = test_var + test_var2; //30
-
-    s64 test_var4 = !(test_var3/10);
-    s64 neg_var = -test_var2;
-	
-	test_var3 = test_var <= test_var2 > 5 & 3 || (4 | 1 == 2);
 	
 	//c8* test = "Hi my name is What";
 
+
     for(s64 i = 0; i < test_var3; i = i+1)
     {
-        test_var2 = test_var2 + 33;
+
+        if( i < 2)
+        {
+            continue;
+        }
+        
+        if(test_var2 > 1000)
+        {
+            break;
+        }
+
+        test_var2 = test_var2 + 99;
     }
 
-
-
-    while(test_var3 > 0)
-    {
-        test_var3 = test_var3 -1;
-    }
-
-   	if(test_var == 25)
+    return test_var2;
+    
+    if(test_var == 25)
 	{
 		return test_var3 + 20; //50
 	}
