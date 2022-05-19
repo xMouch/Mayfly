@@ -6,8 +6,17 @@ fn main(s64 argc, s64* argv) : s64
 	*/
 	s64 test_var;
 	test_var = 25;
+	
+	f64 float = 0.5;
+	f64 float2 = 2;
 
 	s64 test_var2 = (5 + 12 - 2)/3;
+	
+	f64 a = test_var - float2; //23
+	s64 b = 5 - test_var; //-20
+	
+	s64 res = a * 2 / (-b / 2) + test_var; //29
+	return res;
 	
 	s64 test_var3 = test_var + test_var2; //30
 	

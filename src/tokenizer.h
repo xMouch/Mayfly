@@ -313,8 +313,12 @@ Token* tokenize(String file, Heap_Allocator* heap)
         {
             token.type = TOKEN_NUM;
             u32 num_length = 0;
-            while(is_number(t.n[0])) 
+            bool isFloat = false;
+            while(is_number(t.n[0]) || (!isFloat && t.n[0]=='.'))
             {
+                if (t.n[0]=='.'){
+                    isFloat = true;
+                }
                 num_length++;
                 adv_chars(&t, 1);
             }

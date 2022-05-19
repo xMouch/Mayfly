@@ -1,8 +1,6 @@
 #ifndef MAYFLY_NODES_H
 #define MAYFLY_NODES_H
 
-
-//TODO(Alexius): & | < > hinzufügen :) und richtig umbenennen N_AND zu N_CMP_AND usw. N_EQ zu N_CMP_EQ
 enum NodeType{
     N_EMPTY,
     N_ASSIGN,
@@ -28,6 +26,9 @@ enum NodeType{
     N_CMP_GT,
     N_CMP_LEQ,
     N_CMP_GEQ,
+    //
+    N_TO_F64,
+    N_TO_S64,
     //
     N_IF,
     N_ELSE,
@@ -58,6 +59,9 @@ struct Function{
     Variable* arguments;
 };
 
+enum DataType{
+    C8, S64, F64
+};
 
 struct Node{
     NodeType type;
@@ -65,11 +69,12 @@ struct Node{
     union{
         s64 sValue;
         f64 fValue;
-        b8 bValue;
+        c8 cValue;
         String str;
         Variable* var;
         Function* func;
     };
+    DataType dataType;
     Node* left;
     Node* right;
 };
@@ -102,6 +107,8 @@ String type_to_str(NodeType t)
         case N_CMP_GT:  return IR_CONSTZ("N_CMP_GT");
         case N_CMP_LEQ:  return IR_CONSTZ("N_CMP_LEQ");
         case N_CMP_GEQ:  return IR_CONSTZ("N_CMP_GEQ");
+        case N_TO_F64:  return IR_CONSTZ("N_TO_F64");
+        case N_TO_S64:  return IR_CONSTZ("N_TO_S64");
         case N_IF:  return IR_CONSTZ("N_IF");
         case N_ELSE:  return IR_CONSTZ("N_ELSE");
         case N_FOR:  return IR_CONSTZ("N_FOR");
