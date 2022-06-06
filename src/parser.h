@@ -6,7 +6,7 @@ Heap_Allocator* p_heap;
 s64 p_currentIndex;
 Token* p_currentToken;
 Token* p_tokens;
-b8 p_parsing;
+c8 p_parsing;
 
 Node* p_nodes;
 Variable* p_variables;
@@ -16,6 +16,33 @@ msi p_currentScope;
 Function* p_functions;
 
 Token getPreviousToken(msi howFarBack);
+
+DataType tokenTypeToDatatype(Token_Type t){
+    switch (t) {
+        case TOKEN_F64:
+            return F64;
+        case TOKEN_S64:
+            return S64;
+        case TOKEN_C8:
+            return C8;
+        default:
+            IR_INVALID_CASE;
+            return S64;
+    }
+}
+
+NodeType dataTypeToConversionOp(DataType d){
+    switch (d) {
+        case F64:
+            return N_TO_F64;
+        case S64:
+        case C8:
+            return N_TO_S64;
+        default:
+            IR_INVALID_CASE;
+            return N_EMPTY;
+    }
+}
 
 Node* makeNode(Node newNode, s64 textOffset = 0){
     newNode.line_text = getPreviousToken(-textOffset).line_text;
@@ -28,6 +55,20 @@ Node* derefChain(Node* child, msi count){
         return makeNode({.type=N_DEREF, .left=derefChain(child, count-1)});
     else
         return child;
+}
+
+DataType convertNodes(Node** left, Node** right, bool assignment = false){
+    if((*left)->dataType != (*right)->dataType && ((*left)->dataType == F64 || (*right)->dataType == F64)){
+        DataType resType = assignment?(*left)->dataType:(DataType)s64_max((*left)->dataType, (*right)->dataType);
+        if ((*left)->dataType != resType){
+            *left = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*left});
+        }
+        else{
+            *right = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*right});
+        }
+        return resType;
+    }
+    return (*left)->dataType;
 }
 
 void increaseScope(){
@@ -59,7 +100,7 @@ Token getPreviousToken(msi howFarBack){
     return Token{};
 }
 
-b8 accept(msi tokenType){
+c8 accept(msi tokenType){
     if (p_parsing == 1 && p_currentToken->type == tokenType) {
         nextToken();
         return true;
@@ -69,7 +110,7 @@ b8 accept(msi tokenType){
     return false;
 }
 
-b8 expect(msi tokenType){
+c8 expect(msi tokenType){
     if (accept(tokenType))
         return true;
     printf("Error at %llu:%llu, expected: %.*s got: %.*s\n",
@@ -115,7 +156,8 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
     }
 }
 
-b8 acceptId(Token_Type declarationType, msi pointerLvl){
+
+c8 acceptId(Token_Type declarationType, msi pointerLvl){
     if (accept(TOKEN_ID)){
         inspectId(declarationType, pointerLvl, getPreviousToken(1));
         return true;
@@ -156,10 +198,16 @@ Token_Type acceptType(){
     return TOKEN_UNKOWN;
 }
 
+void operandError(Token_Type operation, Node node){
+    printf("error: invalid operands for operation %.*s\n", type_to_str(operation));
+    printf("%.*s\n", node.line_text);
+    exit(1);
+}
+
 Node* expression();
 Node* statements();
 
-Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
+Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
     Node* n;
     if(varType != TOKEN_UNKOWN){
         msi pointerLvl = 0;
@@ -168,7 +216,10 @@ Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
         msi index = expectId(varType, pointerLvl);
 
         if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
-            n = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.var=&p_variables[index]}),.right=expression()});
+            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            Node* right = expression();
+            convertNodes(&left, &right, true);
+            n = makeNode({.type=N_ASSIGN,.left=left,.right=right});
         }
         else
             n = makeNode({.type=N_EMPTY});
@@ -178,9 +229,14 @@ Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
             pointerLvl++;
         if (acceptId(TOKEN_UNKOWN, pointerLvl)){
             msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
-            if(accept('='))
-                n = makeNode({.type=N_ASSIGN,.left=derefChain(makeNode({.type=N_VAR,.var=&p_variables[index]}),pointerLvl),.right=expression()});
-            else{
+            if(accept('=')){
+                Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+                Node* right = expression();
+                convertNodes(&left, &right, true);
+                if (left->dataType == F64 && pointerLvl>0)
+                    operandError((Token_Type)'*',*left);
+                n = makeNode({.type=N_ASSIGN,.left=derefChain(left,pointerLvl),.right=right});
+            }else{
                 previousToken();
                 n = expression();
                 n = derefChain(n, pointerLvl);
@@ -193,7 +249,7 @@ Node* assignmentOrExpression(Token_Type varType, b8 emptyAssignAllowed){
     return n;
 }
 
-Node* function(b8 declaration){
+Node* function(c8 declaration){
     if (declaration){
         Token_Type t;
         Function f{};
@@ -230,7 +286,7 @@ Node* function(b8 declaration){
         expect('}');
         return n;
     } else {
-        //TODO: function signature checking requires knowledge of expression type
+        //TODO: function signature checking requires knowledge of expression type; node datatype
         expect(TOKEN_ID);
         expect('(');
         if(!accept(')'))
@@ -364,7 +420,7 @@ Node* statements(){
     if ((n1=statement()) != nullptr){
         return makeNode({.type=N_STMNT, .left=n1, .right=statements()});
     }
-    return nullptr;
+    return makeNode({.type=N_EMPTY});
 }
 
 Node* term(){
@@ -376,19 +432,19 @@ Node* term(){
         }
         else{
             msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
-                return makeNode({.type=N_VAR, .var=&p_variables[index]});
+                return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=tokenTypeToDatatype(p_variables[index].dataType)});
         }
     }
     else if (accept(TOKEN_NUM)){
         if(search_string_first_occurrence(getPreviousToken(1).text,'.').length>0){
             f64 val = strtod(getPreviousToken(1).text.data, &p_currentToken->text.data);
-            return makeNode({.type=N_FLOAT, .fValue=val});
+            return makeNode({.type=N_FLOAT, .fValue=val, .dataType=F64});
         }else{
             s64 val = strtol(getPreviousToken(1).text.data, &p_currentToken->text.data,10);
-           return makeNode({.type=N_NUM, .sValue=val});
+           return makeNode({.type=N_NUM, .sValue=val, .dataType=S64});
         }
     }else if(accept(TOKEN_STR_LIT)){
-        return makeNode({.type=N_STR, .str=getPreviousToken(1).text});
+        return makeNode({.type=N_STR, .str=getPreviousToken(1).text, .dataType=S64}); //TODO strings
     }else{
         expect('(');
         Node* n = expression();
@@ -401,11 +457,13 @@ Node* term(){
 //https://en.cppreference.com/w/c/language/operator_precedence
 Node* exp2(){
     if (accept('-')){
-        return makeNode({.type=N_NEG,.left=term()});
+        Node* n = term();
+        return makeNode({.type=N_NEG,.dataType=n->dataType,.left=n});
     } else if (accept('*')){
-        return makeNode({.type=N_DEREF,.left=term()});
+        Node* n = term();
+        return makeNode({.type=N_DEREF,.dataType=n->dataType,.left=n});
     } else if (accept('!')){
-        return makeNode({.type=N_NOT,.left=term()});
+        return makeNode({.type=N_NOT,.dataType=S64,.left=term()});
     } else {
         accept('+');
         return term();
@@ -414,88 +472,134 @@ Node* exp2(){
 
 Node* exp3(){
     Node* returnVal = exp2();
-    while (accept('*') || accept('/') || accept('%'))
-        returnVal = makeNode({.type=(getPreviousToken(1).type=='*')?N_MUL:
-                              (getPreviousToken(1).type=='/')?N_DIV:N_MOD,
-                              .left=returnVal,.right=exp2()});
+    while (accept('*') || accept('/') || accept('%')){
+        if (getPreviousToken(1).type=='%'){
+            Node* right=exp2();
+            if (right->dataType == F64 || returnVal->dataType == F64)
+                operandError((Token_Type)'%',*returnVal);
+
+            DataType resType = convertNodes(&returnVal, &right);
+            returnVal = makeNode({.type=N_MOD,.dataType=resType,
+                                  .left=returnVal,.right=right});
+        }
+        else
+        {
+            NodeType nodeType = (getPreviousToken(1).type=='*')?N_MUL:N_DIV;
+            Node* right=exp2();
+            DataType resType = convertNodes(&returnVal, &right);
+            returnVal = makeNode({.type=nodeType,.dataType=resType,
+                                  .left=returnVal,.right=right});
+        }
+    }
     return returnVal;
 }
 
 Node* exp4(){
     Node* returnVal = exp3();
-    while (accept('+') || accept('-'))
-        returnVal = makeNode({.type=(getPreviousToken(1).type=='+')?N_ADD:N_SUB,
-                              .left=returnVal,.right=exp3()});
+    while (accept('+') || accept('-')){
+        NodeType nodeType = (getPreviousToken(1).type=='+')?N_ADD:N_SUB;
+        Node* right=exp3();
+        DataType resType = convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=nodeType,.dataType=resType,
+                              .left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* exp6(){
     Node* returnVal = exp4();
     while (accept(TOKEN_LEQ) || accept(TOKEN_GEQ) || accept('<') || accept('>')){
-        NodeType n;
+        NodeType nodeType;
         switch (getPreviousToken(1).type) {
             case '<':
-                n = N_CMP_LT;
+                nodeType = N_CMP_LT;
                 break;
             case '>':
-                n = N_CMP_GT;
+                nodeType = N_CMP_GT;
                 break;
             case TOKEN_LEQ:
-                n = N_CMP_LEQ;
+                nodeType = N_CMP_LEQ;
                 break;
             case TOKEN_GEQ:
-                n = N_CMP_GEQ;
+                nodeType = N_CMP_GEQ;
                 break;
             default:
-                n = N_EMPTY;
+                nodeType = N_EMPTY;
                 IR_INVALID_CASE
         }
-        returnVal = makeNode({.type=n,.left=returnVal,.right=exp4()});
+        Node* right=exp4();
+        convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=nodeType,.dataType=S64,.left=returnVal,.right=right}); //for cmp ops datatype of children is of importance
     }
     return returnVal;
 }
 
 Node* exp7(){
     Node* returnVal = exp6();
-    while (accept(TOKEN_D_EQ) || accept(TOKEN_NOTEQ))
-        returnVal = makeNode({.type=(getPreviousToken(1).type==TOKEN_D_EQ)?N_CMP_EQ:N_CMP_NEQ,
-                              .left=returnVal,.right=exp6()});
+    while (accept(TOKEN_D_EQ) || accept(TOKEN_NOTEQ)){
+        NodeType nodeType = (getPreviousToken(1).type==TOKEN_D_EQ)?N_CMP_EQ:N_CMP_NEQ;
+        Node* right=exp6();
+        convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=nodeType,.dataType=S64,
+                              .left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* exp8(){
     Node* returnVal = exp7();
-    while (accept('&'))
-        returnVal = makeNode({.type=N_AND,.left=returnVal,.right=exp7()});
+    while (accept('&')){
+        Node* right=exp7();
+        if (right->dataType == F64 || returnVal->dataType == F64)
+            operandError((Token_Type)'&',*returnVal);
+        DataType resType = convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=N_AND,.dataType=resType,.left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* exp9(){
     Node* returnVal = exp8();
-    while (accept('^'))
-        returnVal = makeNode({.type=N_XOR,.left=returnVal,.right=exp8()});
+    while (accept('^')){
+        Node* right=exp8();
+        if (right->dataType == F64 || returnVal->dataType == F64)
+            operandError((Token_Type)'^',*returnVal);
+        DataType resType = convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=N_XOR,.dataType=resType,.left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* exp10(){
     Node* returnVal = exp9();
-    while (accept('|'))
-        returnVal = makeNode({.type=N_OR,.left=returnVal,.right=exp9()});
+    while (accept('|')){
+        Node* right=exp9();
+        if (right->dataType == F64 || returnVal->dataType == F64)
+            operandError((Token_Type)'|',*returnVal);
+        DataType resType = convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=N_OR,.dataType=resType,.left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* exp11(){
     Node* returnVal = exp10();
-    while (accept(TOKEN_AND))
-        returnVal = makeNode({.type=N_CMP_AND,.left=returnVal,.right=exp10()});
+    while (accept(TOKEN_AND)){
+        Node* right=exp10();
+        convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=N_CMP_AND,.dataType=S64,.left=returnVal,.right=right});
+    }
     return returnVal;
 }
 
 Node* expression(){
     Node* returnVal = exp11();
-    while (accept(TOKEN_OR))
-        returnVal = makeNode({.type=N_CMP_OR,.left=returnVal,.right=exp11()});
-    returnVal = makeNode({.type=N_EXPR,.left=returnVal,.right=nullptr});
+    while (accept(TOKEN_OR)){
+        Node* right=exp11();
+        convertNodes(&returnVal, &right);
+        returnVal = makeNode({.type=N_CMP_OR,.dataType=S64,.left=returnVal,.right=right});
+    }
+    returnVal = makeNode({.type=N_EXPR,.dataType=returnVal->dataType,.left=returnVal,.right=nullptr});
     return returnVal;
 }
 
@@ -508,7 +612,10 @@ Node* block(){
             pointerLvl++;
         msi index = expectId(t, pointerLvl);
         if (accept('=')){
-                node = makeNode({.type=N_ASSIGN,.left=makeNode({.type=N_VAR,.var=&p_variables[index]}),.right=expression()});
+            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            Node* right = expression();
+            convertNodes(&left, &right, true);
+            node = makeNode({.type=N_ASSIGN,.left=left,.right=right});
         }
         expect(';');
         return node;
@@ -541,7 +648,9 @@ void printTree(Node* n, s64 offset){
             for (msi i=0;i< ARR_LEN(n->func->arguments);i++)
                 printVar(n->func->arguments[i]);
             printf(")\n");
-        }else
+        }else if(n->type==N_FLOAT)
+            printf("%.*s %f\n", type_to_str(n->type), n->fValue);
+        else
             printf("%.*s %u\n", type_to_str(n->type), n->sValue);
         printTree(n->left, offset+1);
         printTree(n->right, offset+1);

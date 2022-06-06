@@ -30,7 +30,10 @@ Instr* read_entire_file(c8* file_name, Heap_Allocator* heap)
 
 struct Machine 
 {
-    s64* r;
+    union{
+        s64* r;
+        f64* fR;
+    };
 };
 
 int main(s32 argc, c8** argv)
@@ -259,6 +262,144 @@ int main(s32 argc, c8** argv)
                 }
                 break;
             }
+
+            case OP_TO_F64:
+            {
+                m.fR[i.I.dest] = m.r[i.I.op];
+                break;
+            }
+            case OP_TO_S64:
+            {
+                m.r[i.I.dest] = m.fR[i.I.op];
+                break;
+            }
+            
+            case OP_F_ADD:
+            {
+                m.fR[i.R.dest] = m.fR[i.R.op1] + m.fR[i.R.op2];
+                break;   
+            }
+            case OP_F_SUB:  
+            {
+                m.fR[i.R.dest] = m.fR[i.R.op1] - m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_MUL:  
+            {
+                m.fR[i.R.dest] = m.fR[i.R.op1] * m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_DIV:  
+            {
+                m.fR[i.R.dest] = m.fR[i.R.op1] / m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_AND:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] && m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_OR:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] || m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_EQ:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] == m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_NEQ:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] != m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_LT:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] < m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_CMP_GT:  
+            {
+                m.r[i.R.dest] = m.fR[i.R.op1] > m.fR[i.R.op2];
+                break;
+            }
+            case OP_F_IADD:  
+            {
+                m.fR[i.I.dest] = m.fR[i.I.op] + i.I.fImm;
+                break;
+            }
+            case OP_F_ISUB:  
+            {
+                m.fR[i.I.dest] = m.fR[i.I.op] - i.I.fImm;
+                break;
+            }
+            case OP_F_IMUL:  
+            {
+                m.fR[i.I.dest] = m.fR[i.I.op] * i.I.fImm;
+                break;
+            }
+            case OP_F_IDIV:  
+            {
+                m.fR[i.I.dest] = m.fR[i.I.op] / i.I.fImm;
+                break;
+            }
+            case OP_LOADF:  
+            {
+                m.fR[i.I.dest] = ((f64*)m.r[i.I.op])[i.I.imm];
+                break;
+            }
+            case OP_STOREF:
+            {
+                ((f64*)m.r[i.I.dest])[i.I.imm] = m.fR[i.I.op];
+                break;
+            }
+            case OP_F_ICMP_AND:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] && i.I.imm;
+                break;
+            }
+            case OP_F_ICMP_OR:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] || i.I.imm;
+                break;
+            }
+            case OP_F_ICMP_EQ:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] == i.I.imm;
+                break;
+            }
+            case OP_F_ICMP_NEQ:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] != i.I.imm;
+                break;
+            }
+            case OP_F_ICMP_LT:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] < i.I.imm;
+                break;
+            }
+            case OP_F_ICMP_GT:  
+            {
+                m.r[i.I.dest] = m.fR[i.I.op] > i.I.imm;
+                break;
+            }
+            case OP_F_BEQ:  
+            {
+                if(m.fR[i.I.dest] == m.fR[i.I.op])
+                {
+                    m.r[R_PROG_CNT] += i.I.imm;
+                }
+                break;
+            }
+            case OP_F_BNE:  
+            {
+                if(m.fR[i.I.dest] != m.fR[i.I.op])
+                {
+                    m.r[R_PROG_CNT] += i.I.imm;
+                }
+                break;
+            }
             case OP_JMP:  
             {
                 m.r[R_PROG_CNT] = i.J.jmp;
@@ -278,7 +419,7 @@ int main(s32 argc, c8** argv)
             }
             default:
             {
-                fprintf(stderr, "AHHHHHHHHHHHHHHHHHHHH!!!!!!\n");
+                fprintf(stderr, "INSTRUCTION NOT IMPLEMENTED: %.*s\n", opcode_to_str((Opcode)i.R.opcode));
                 break;   
             }
         }
