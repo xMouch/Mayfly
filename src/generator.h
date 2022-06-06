@@ -700,6 +700,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
         res_right = gen_expr(node->right, meta);
     
     Expr_Result result = {};
+    result.dataType = node->dataType;
     
     switch(node->type)
     {
@@ -1265,10 +1266,16 @@ void gen_return(Node* node, Metadata* meta)
     Instr instr = {};
     if(expr_res.constant)
     {
-        instr.I.opcode = OP_IADD;
+        if (expr_res.dataType==F64){
+            instr.I.opcode = OP_F_IADD;
+            instr.I.fImm = expr_res.fValue;
+        }
+        else{
+            instr.I.opcode = OP_IADD;
+            instr.I.imm = get_value(expr_res);
+        }
         instr.I.dest = R_RETURN;
         instr.I.op = R_ZERO;
-        instr.I.imm = get_value(expr_res);
         instr.I.shift = 0;
         
     }

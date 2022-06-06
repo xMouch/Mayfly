@@ -71,6 +71,16 @@ DataType convertNodes(Node** left, Node** right, bool assignment = false){
     return (*left)->dataType;
 }
 
+DataType convertNode(DataType left, Node** right){
+    if(left != (*right)->dataType && (left == F64 || (*right)->dataType == F64)){
+        DataType resType = left;
+        if ((*right)->dataType != resType){
+            *right = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*right});
+        }
+    }
+    return left;
+}
+
 void increaseScope(){
     p_currentScope++;
 }
@@ -405,7 +415,9 @@ Node* statement(){
         return n;
     }
     if (accept(TOKEN_RETURN)){
-        n = makeNode({.type=N_RETURN, .left=expression()});
+        Node* left = expression();
+        convertNode(tokenTypeToDatatype(ARR_LAST(p_functions)->returnType), &left);
+        n = makeNode({.type=N_RETURN, .left=left});
         expect(';');
         return n;
     }
