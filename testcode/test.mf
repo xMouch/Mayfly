@@ -43,10 +43,11 @@ fn main(s64 argc, s64* argv) : s64
     
     if(test_var == 25)
 	{
-		return test_var3 + 20; //50
+		return float;//test_var3 + 20; //50
 	}
 	else
 	{
 		return 42;
 	}
 }
+
