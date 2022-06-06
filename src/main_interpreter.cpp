@@ -49,7 +49,6 @@ int main(s32 argc, c8** argv)
         return 0;
     }
     
-    
     Machine m = {};
     ARR_INIT(m.r, 64, &heap);
     m.r[R_ZERO] = 0;
