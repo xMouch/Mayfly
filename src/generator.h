@@ -45,6 +45,14 @@ enum Opcode
     OP_SHIFT_R,
     OP_SHIFT_L,
     
+    //8bit Integer
+    OP_8_ADD,
+    OP_8_SUB,
+    OP_8_MUL,
+    OP_8_DIV,
+    OP_8_MOD,
+    OP_8_SHIFT_R,
+    OP_8_SHIFT_L,
     
     //COMPARE
     OP_CMP_AND,
@@ -53,22 +61,18 @@ enum Opcode
     OP_CMP_NEQ,
     OP_CMP_LT,
     OP_CMP_GT,
-
+    
     //FLOAT
     OP_F_ADD,
     OP_F_SUB,
     OP_F_MUL,
     OP_F_DIV,
-    OP_F_CMP_AND,
-    OP_F_CMP_OR,
-    OP_F_CMP_EQ,
-    OP_F_CMP_NEQ,
     OP_F_CMP_LT,
     OP_F_CMP_GT,
     
     //I_TYPES
     //INTEGER
-    OP_IADD = 32,
+    OP_IADD = 64,
     OP_ISUB,
     OP_IMUL,
     OP_IDIV,
@@ -77,6 +81,16 @@ enum Opcode
     OP_IOR,
     OP_ISHIFT_R,
     OP_ISHIFT_L,
+    
+    
+    //8bit Integer
+    OP_8_IADD,
+    OP_8_ISUB,
+    OP_8_IMUL,
+    OP_8_IDIV,
+    OP_8_IMOD,
+    OP_8_ISHIFT_R,
+    OP_8_ISHIFT_L,
     
     //COMPARE
     OP_ICMP_AND,
@@ -89,21 +103,15 @@ enum Opcode
     //Branch
     OP_BEQ,
     OP_BNE,
-
+    
     //FLOAT
     OP_F_IADD,
     OP_F_ISUB,
     OP_F_IMUL,
     OP_F_IDIV,
-    OP_F_ICMP_AND,
-    OP_F_ICMP_OR,
-    OP_F_ICMP_EQ,
-    OP_F_ICMP_NEQ,
     OP_F_ICMP_LT,
     OP_F_ICMP_GT,
-    OP_F_BEQ,
-    OP_F_BNE,
-
+    
     //Conversion
     OP_TO_F64,
     OP_TO_S64,
@@ -114,9 +122,6 @@ enum Opcode
     OP_LOAD8,
     OP_STORE64,
     OP_STORE8,
-
-    OP_LOADF,
-    OP_STOREF,
     
     
     
@@ -211,90 +216,42 @@ Opcode opcode_to_float_opcode(Opcode opcode){
         case OP_SUB:  return OP_F_SUB;
         case OP_MUL:  return OP_F_MUL;
         case OP_DIV:  return OP_F_DIV;
-        case OP_MOD:  IR_INVALID_CASE
-        case OP_AND:  IR_INVALID_CASE
-        case OP_OR:  IR_INVALID_CASE
-        case OP_SHIFT_R:  IR_INVALID_CASE
-        case OP_SHIFT_L:  IR_INVALID_CASE
-        case OP_CMP_AND:  return OP_F_CMP_AND;
-        case OP_CMP_OR:  return OP_F_CMP_OR;
-        case OP_CMP_EQ:  return OP_F_CMP_EQ;
-        case OP_CMP_NEQ:  return OP_F_CMP_NEQ;
         case OP_CMP_LT:  return OP_F_CMP_LT;
         case OP_CMP_GT:  return OP_F_CMP_GT;
         case OP_IADD:  return OP_F_IADD;
         case OP_ISUB:  return OP_F_ISUB;
         case OP_IMUL:  return OP_F_IMUL;
         case OP_IDIV:  return OP_F_IDIV;
-        case OP_IMOD:  IR_INVALID_CASE
-        case OP_IAND:  IR_INVALID_CASE
-        case OP_IOR:  IR_INVALID_CASE
-        case OP_ISHIFT_R:  IR_INVALID_CASE
-        case OP_ISHIFT_L:  IR_INVALID_CASE
-        case OP_ICMP_AND:  return OP_F_ICMP_AND;
-        case OP_ICMP_OR:  return OP_F_ICMP_OR;
-        case OP_ICMP_EQ:  return OP_F_ICMP_EQ;
-        case OP_ICMP_NEQ:  return OP_F_ICMP_NEQ;
         case OP_ICMP_LT:  return OP_F_ICMP_LT;
         case OP_ICMP_GT:  return OP_F_ICMP_GT;
-        case OP_LOAD64:
-        case OP_LOAD8:  return OP_LOADF;
-        case OP_STORE64:
-        case OP_STORE8:  return OP_STOREF;
-        case OP_TO_F64:  IR_INVALID_CASE
-        case OP_TO_S64:  IR_INVALID_CASE
-        case OP_BEQ:  return OP_F_BEQ;
-        case OP_BNE:  return OP_F_BNE;
-        case OP_JMP:  IR_INVALID_CASE
-        case OP_JMPR:  IR_INVALID_CASE
-        default: IR_INVALID_CASE; return OP_ADD;
+        default: return opcode;
+    }
+}
+
+static
+Opcode opcode_to_8_opcode(Opcode opcode){
+    switch(opcode) {
+        case OP_ADD:  return OP_8_ADD;
+        case OP_SUB:  return OP_8_SUB;
+        case OP_MUL:  return OP_8_MUL;
+        case OP_DIV:  return OP_8_DIV;
+        case OP_MOD:  return OP_8_MOD;
+        case OP_IADD:  return OP_8_IADD;
+        case OP_ISUB:  return OP_8_ISUB;
+        case OP_IMUL:  return OP_8_IMUL;
+        case OP_IDIV:  return OP_8_IDIV;
+        default: return opcode;
     }
 }
 
 static
 bool is_float_op(Opcode opcode){
-    switch(opcode) {
-        case OP_ADD:
-        case OP_SUB:
-        case OP_MUL:
-        case OP_DIV:
-        case OP_MOD:
-        case OP_AND:
-        case OP_OR:
-        case OP_SHIFT_R:
-        case OP_SHIFT_L:
-        case OP_CMP_AND:
-        case OP_CMP_OR:
-        case OP_CMP_EQ:
-        case OP_CMP_NEQ:
-        case OP_CMP_LT:
-        case OP_CMP_GT:
-        case OP_IADD:
-        case OP_ISUB:
-        case OP_IMUL:
-        case OP_IDIV:
-        case OP_IMOD:
-        case OP_IAND:
-        case OP_IOR:
-        case OP_ISHIFT_R:
-        case OP_ISHIFT_L:
-        case OP_ICMP_AND:
-        case OP_ICMP_OR:
-        case OP_ICMP_EQ:
-        case OP_ICMP_NEQ:
-        case OP_ICMP_LT:
-        case OP_ICMP_GT:
-        case OP_LOAD64:
-        case OP_LOAD8:
-        case OP_STORE64:
-        case OP_STORE8:
-        case OP_TO_F64:
-        case OP_BEQ:
-        case OP_BNE:
-        case OP_JMP:
-        case OP_JMPR: return false;
-        default: return true;
+    if((((s64)opcode) >= OP_F_ADD && ((s64)opcode) <= OP_F_CMP_GT) || 
+       (((s64)opcode) >= OP_F_IADD && ((s64)opcode) <= OP_F_ICMP_GT))
+    {
+        return true;
     }
+    return false;
 }
 
 static
@@ -321,10 +278,6 @@ String opcode_to_str(Opcode opcode)
         case OP_F_SUB:  return IR_CONSTZ("OP_F_SUB");
         case OP_F_MUL:  return IR_CONSTZ("OP_F_MUL");
         case OP_F_DIV:  return IR_CONSTZ("OP_F_DIV");
-        case OP_F_CMP_AND:  return IR_CONSTZ("OP_F_CMP_AND");
-        case OP_F_CMP_OR:  return IR_CONSTZ("OP_F_CMP_OR");
-        case OP_F_CMP_EQ:  return IR_CONSTZ("OP_F_CMP_EQ");
-        case OP_F_CMP_NEQ:  return IR_CONSTZ("OP_F_CMP_NEQ");
         case OP_F_CMP_LT:  return IR_CONSTZ("OP_F_CMP_LT");
         case OP_F_CMP_GT:  return IR_CONSTZ("OP_F_CMP_GT");
         case OP_IADD:  return IR_CONSTZ("OP_IADD");
@@ -342,10 +295,8 @@ String opcode_to_str(Opcode opcode)
         case OP_F_IDIV:  return IR_CONSTZ("OP_F_IDIV");
         case OP_LOAD64:  return IR_CONSTZ("OP_LOAD64");
         case OP_LOAD8:  return IR_CONSTZ("OP_LOAD8");
-        case OP_LOADF:  return IR_CONSTZ("OP_LOADF");
         case OP_STORE64:  return IR_CONSTZ("OP_STORE64");
         case OP_STORE8:  return IR_CONSTZ("OP_STORE8");
-        case OP_STOREF:  return IR_CONSTZ("OP_STOREF");
         case OP_TO_F64:  return IR_CONSTZ("OP_TO_F64");
         case OP_TO_S64:  return IR_CONSTZ("OP_TO_S64");
         case OP_ICMP_AND:  return IR_CONSTZ("OP_ICMP_AND");
@@ -356,65 +307,55 @@ String opcode_to_str(Opcode opcode)
         case OP_ICMP_GT:  return IR_CONSTZ("OP_ICMP_GT");
         case OP_BEQ:  return IR_CONSTZ("OP_BEQ");
         case OP_BNE:  return IR_CONSTZ("OP_BNE");
-        case OP_F_ICMP_AND:  return IR_CONSTZ("OP_ICMP_AND");
-        case OP_F_ICMP_OR:  return IR_CONSTZ("OP_ICMP_OR");
-        case OP_F_ICMP_EQ:  return IR_CONSTZ("OP_ICMP_EQ");
-        case OP_F_ICMP_NEQ:  return IR_CONSTZ("OP_ICMP_NEQ");
-        case OP_F_ICMP_LT:  return IR_CONSTZ("OP_ICMP_LT");
-        case OP_F_ICMP_GT:  return IR_CONSTZ("OP_ICMP_GT");
-        case OP_F_BEQ:  return IR_CONSTZ("OP_BEQ");
-        case OP_F_BNE:  return IR_CONSTZ("OP_BNE");
+        case OP_F_ICMP_LT:  return IR_CONSTZ("OP_F_ICMP_LT");
+        case OP_F_ICMP_GT:  return IR_CONSTZ("OP_F_ICMP_GT");
         case OP_JMP:  return IR_CONSTZ("OP_JMP");
         case OP_JMPR:  return IR_CONSTZ("OP_JMPR");
+        case OP_8_ADD:  return IR_CONSTZ("OP_8_ADD");
+        case OP_8_SUB:  return IR_CONSTZ("OP_8_SUB");
+        case OP_8_MUL:  return IR_CONSTZ("OP_8_MUL");
+        case OP_8_DIV:  return IR_CONSTZ("OP_8_DIV");
+        case OP_8_MOD:  return IR_CONSTZ("OP_8_MOD"); 
+        case OP_8_IADD:  return IR_CONSTZ("OP_8_IADD");
+        case OP_8_ISUB:  return IR_CONSTZ("OP_8_ISUB");
+        case OP_8_IMUL:  return IR_CONSTZ("OP_8_IMUL");
+        case OP_8_IDIV:  return IR_CONSTZ("OP_8_IDIV");
+        case OP_8_IMOD:  return IR_CONSTZ("OP_8_IMOD");
+        case OP_8_ISHIFT_R:  return IR_CONSTZ("OP_8_ISHIFT_R");
+        case OP_8_ISHIFT_L:  return IR_CONSTZ("OP_8_ISHIFT_L");
         default: return IR_CONSTZ("OPCODE PRINT NOT IMPLEMENTED");
     }
 }
 
 static bool is_commutative(Opcode opcode){
-
+    
     switch(opcode)
     {
         case OP_ADD:
         case OP_MUL:
         case OP_AND:
         case OP_OR:
+        case OP_8_ADD:
+        case OP_8_MUL:
+        case OP_F_ADD:
+        case OP_F_MUL:
         case OP_CMP_AND:
         case OP_CMP_OR:
         case OP_CMP_EQ:
         case OP_CMP_NEQ:
         case OP_IADD:
         case OP_IMUL:
+        case OP_8_IADD:
+        case OP_8_IMUL:
+        case OP_F_IADD:
+        case OP_F_IMUL:
         case OP_IAND:
         case OP_IOR:
         case OP_ICMP_AND:
         case OP_ICMP_OR:
         case OP_ICMP_EQ:
         case OP_ICMP_NEQ:
-            return true;
-        case OP_SUB:
-        case OP_DIV:
-        case OP_MOD:
-        case OP_SHIFT_R:
-        case OP_SHIFT_L:
-        case OP_CMP_LT:
-        case OP_CMP_GT:
-        case OP_ISUB:
-        case OP_IDIV:
-        case OP_IMOD:
-        case OP_ISHIFT_R:
-        case OP_ISHIFT_L:
-        case OP_LOAD64:
-        case OP_LOAD8:
-        case OP_STORE64:
-        case OP_STORE8:
-        case OP_TO_F64:
-        case OP_TO_S64:
-        case OP_ICMP_LT:
-        case OP_ICMP_GT:
-        case OP_BEQ:
-        case OP_BNE:
-        case OP_JMP:
-        case OP_JMPR:
+        return true;
         default: return false;
     }
 }
@@ -568,8 +509,9 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
     Expr_Result result = {};
     
     Instr instr={};
-
-    bool floatOp = left.dataType == F64;
+    
+    b8 floatOp = left.dataType == F64;
+    b8 isC8op = left.dataType == C8 && right.dataType == C8;
     
     //TODO FIX LARGE CONSTANTS
     
@@ -577,11 +519,18 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
     {
         IR_ASSERT(left.value < (s64)(2147483647) && right.value > (s64)(-2147483647) && "TODO FIX LARGE CONSTANTS");
         if (is_commutative(opcode)){
-            if (floatOp){
+            if (floatOp)
+            {
                 instr.I.opcode = opcode_to_float_opcode((Opcode)(opcode + OP_IADD));
                 instr.I.fImm = left.fValue;
             }
-            else{
+            else if(isC8op)
+            {
+                instr.I.opcode = opcode_to_8_opcode((Opcode)(opcode + OP_IADD));
+                instr.I.imm = left.value;
+            }
+            else
+            {
                 instr.I.opcode = opcode + OP_IADD;
                 instr.I.imm = left.value;
             }
@@ -595,15 +544,22 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
                 instr.I.dest = meta->treg_cnt;
                 meta->treg_cnt++;
             }
-        
+            
             result.value = instr.I.dest;
         }
         else{
-            if (floatOp){
+            if (floatOp)
+            {
                 instr.I.opcode = opcode_to_float_opcode(OP_IADD);
                 instr.I.fImm = left.fValue;
             }
-            else{
+            else if(isC8op)
+            {
+                instr.I.opcode = opcode_to_8_opcode(OP_IADD);
+                instr.I.imm = left.value;
+            }
+            else
+            {
                 instr.I.opcode = OP_IADD;
                 instr.I.imm = left.value;
             }
@@ -612,31 +568,44 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
             instr.I.op = R_ZERO;
             instr.I.shift = 0;
             add_instr(instr, cur_line, meta);
-
+            
             u8 tempReg = instr.I.dest;
-
-            if (floatOp){
+            
+            if (floatOp)
+            {
                 instr.R.opcode = opcode_to_float_opcode(opcode);
             }
-            else{
+            else if(isC8op)
+            {
+                instr.R.opcode = opcode_to_8_opcode(opcode);
+            }
+            else
+            {
                 instr.R.opcode = opcode;
             }
             instr.R.op1 = tempReg;
             instr.R.op2 = right.value;
             instr.R.shift = 0;
             instr.R.dest = tempReg;
-
+            
             result.value = instr.R.dest;
         }
     }
     else if(!left.constant && right.constant)
     {
         IR_ASSERT(right.value < (s64)(2147483647) && right.value > (s64)(-2147483647)  && "TODO FIX LARGE CONSTANTS");
-        if (floatOp){
+        if (floatOp)
+        {
             instr.I.opcode = opcode_to_float_opcode((Opcode)(opcode + OP_IADD));
             instr.I.fImm = right.fValue;
         }
-        else{
+        else if(isC8op)
+        {
+            instr.I.opcode = opcode_to_8_opcode((Opcode)(opcode + OP_IADD));
+            instr.I.imm = right.value;
+        }
+        else
+        {
             instr.I.opcode = opcode + OP_IADD;
             instr.I.imm = right.value;
         }
@@ -651,14 +620,20 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
             meta->treg_cnt++;
         }
         result.value = instr.I.dest;
-
+        
     }
     else
     {
-        if (floatOp){
+        if (floatOp)
+        {
             instr.R.opcode = opcode_to_float_opcode(opcode);
         }
-        else{
+        else if(isC8op)
+        {
+            instr.R.opcode = opcode_to_8_opcode(opcode);
+        }
+        else
+        {
             instr.R.opcode = opcode;
         }
         instr.R.op1 = left.value;
@@ -739,9 +714,9 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }else{
                 result.tmp = true;
                 result.constant = false;
-
+                
                 Instr instr={};
-
+                
                 if(res_left.tmp)
                 {
                     instr.I.opcode = OP_TO_S64;
@@ -757,7 +732,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     instr.I.dest =  meta->treg_cnt;;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
-
+                    
                     result.value = meta->treg_cnt;
                     meta->treg_cnt++;
                 }
@@ -774,9 +749,9 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }else{
                 result.tmp = true;
                 result.constant = false;
-
+                
                 Instr instr={};
-
+                
                 if(res_left.tmp)
                 {
                     instr.I.opcode = OP_TO_F64;
@@ -792,7 +767,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     instr.I.dest =  meta->treg_cnt;;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
-
+                    
                     result.value = meta->treg_cnt;
                     meta->treg_cnt++;
                 }
@@ -980,12 +955,6 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
                 Instr instr={};
-                if (result.dataType==F64){
-                    instr.I.opcode = OP_F_ICMP_NEQ;
-                }
-                else{
-                    instr.I.opcode = OP_ICMP_NEQ;
-                }
                 instr.I.imm = 0; //same as float 0
                 instr.I.dest = result.value;
                 instr.I.op = result.value;
@@ -1004,12 +973,6 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
                 Instr instr={};
-                if (result.dataType==F64){
-                    instr.I.opcode = OP_F_ICMP_NEQ;
-                }
-                else{
-                    instr.I.opcode = OP_ICMP_NEQ;
-                }
                 instr.I.dest = result.value;
                 instr.I.imm = 0;
                 instr.I.op = result.value;
@@ -1031,7 +994,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 result.constant = false;
                 
                 Instr instr={};
-
+                
                 if (node->dataType == F64){
                     instr.I.opcode = OP_F_IMUL;
                     instr.I.fImm = -1;
@@ -1039,7 +1002,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     instr.I.opcode = OP_IMUL;
                     instr.I.imm = -1;
                 }
-
+                
                 if(res_left.tmp)
                 {
                     instr.I.dest = res_left.value;
@@ -1153,44 +1116,71 @@ void gen_assign(Node* node, Metadata* meta)
     IR_ASSERT(node->right->type == N_EXPR);
     
     Expr_Result expr_result = gen_expr(node->right, meta);
-
-    bool isFloat = expr_result.dataType == F64;
-
+    
+    b8 isFloat = expr_result.dataType == F64;
+    b8 isC8 = node->left->dataType == C8;
+    
     Instr instr = {};
     if(expr_result.constant)
     {
-        if (isFloat){
+        if (isFloat)
+        {
             instr.I.opcode = OP_F_IADD;
             instr.I.fImm = expr_result.fValue;
         }
-        else{
+        else if(isC8)
+        {
+            instr.I.opcode = OP_8_IADD;
+            instr.I.imm = expr_result.value;   
+        }
+        else
+        {
             instr.I.opcode = OP_IADD;
             instr.I.imm = expr_result.value;
         }
         instr.I.dest = node->left->var->id;
         instr.I.op = R_ZERO;
         instr.I.shift = 0;
-
+        
         add_instr(instr, node->line_text, meta);
     }
     else if(!expr_result.tmp){
-        if (isFloat){
+        if (isFloat)
+        {
             instr.I.opcode = OP_F_IADD;
         }
-        else{
+        else if(isC8)
+        {
+            instr.I.opcode = OP_8_IADD; 
+        }
+        else
+        {
             instr.I.opcode = OP_IADD;
         }
-        instr.R.dest = node->left->var->id;
-        instr.R.op1 = expr_result.value;
-        instr.R.op2 = R_ZERO;
-        instr.R.shift = 0;
-
+        instr.I.dest = node->left->var->id;
+        instr.I.op = expr_result.value;
+        instr.I.imm = R_ZERO;
+        instr.I.shift = 0;
+        
         add_instr(instr, node->line_text, meta);
     }
     else
     {
         //if there is already a tmp register we can change the output to our dest
-        ARR_LAST(meta->instr_list)->R.dest = node->left->var->id;
+        if(isC8 && expr_result.dataType != C8)
+        {
+            instr.I.opcode = OP_8_IADD;
+            instr.I.dest = node->left->var->id;
+            instr.I.op = expr_result.value;
+            instr.I.imm = R_ZERO;
+            instr.I.shift = 0;
+            
+            add_instr(instr, node->line_text, meta);
+        }
+        else
+        {
+            ARR_LAST(meta->instr_list)->R.dest = node->left->var->id;    
+        }
     }
 }
 
@@ -1266,11 +1256,18 @@ void gen_return(Node* node, Metadata* meta)
     Instr instr = {};
     if(expr_res.constant)
     {
-        if (expr_res.dataType==F64){
+        if (expr_res.dataType==F64)
+        {
             instr.I.opcode = OP_F_IADD;
             instr.I.fImm = expr_res.fValue;
         }
-        else{
+        else if(expr_res.dataType==C8)
+        {
+            instr.I.opcode = OP_8_IADD;
+            instr.I.imm = get_value(expr_res);
+        }
+        else
+        {
             instr.I.opcode = OP_IADD;
             instr.I.imm = get_value(expr_res);
         }
@@ -1281,7 +1278,15 @@ void gen_return(Node* node, Metadata* meta)
     }
     else
     {
-        instr.R.opcode = OP_ADD;
+        if(expr_res.dataType==C8)
+        {
+            instr.R.opcode = OP_8_ADD;
+        }
+        else
+        {
+            
+            instr.R.opcode = OP_ADD;
+        }
         instr.R.dest = R_RETURN;
         instr.R.op1 = expr_res.value;
         instr.R.op2 = R_ZERO;

@@ -121,6 +121,41 @@ int main(s32 argc, c8** argv)
                 m.r[i.R.dest] = m.r[i.R.op1] << m.r[i.R.op2];
                 break;
             }
+            case OP_8_ADD:
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] + (s8)m.r[i.R.op2]);
+                break;   
+            }
+            case OP_8_SUB:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] - (s8)m.r[i.R.op2]);
+                break;
+            }
+            case OP_8_MUL:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] * (s8)m.r[i.R.op2]);
+                break;
+            }
+            case OP_8_DIV:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] / (s8)m.r[i.R.op2]);
+                break;
+            }
+            case OP_8_MOD:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] % (s8)m.r[i.R.op2]);
+                break;
+            }
+            case OP_8_SHIFT_R:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] >> (s8)m.r[i.R.op2]);
+                break;
+            }
+            case OP_8_SHIFT_L:  
+            {
+                m.r[i.R.dest] = (s8)((s8)m.r[i.R.op1] << (s8)m.r[i.R.op2]);
+                break;
+            }
             case OP_CMP_AND:  
             {
                 m.r[i.R.dest] = m.r[i.R.op1] && m.r[i.R.op2];
@@ -196,6 +231,41 @@ int main(s32 argc, c8** argv)
                 m.r[i.I.dest] = m.r[i.I.op] << i.I.imm;
                 break;
             }
+            case OP_8_IADD:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] + (s8)i.I.imm);
+                break;
+            }
+            case OP_8_ISUB:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] - (s8)i.I.imm);
+                break;
+            }
+            case OP_8_IMUL:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] * (s8)i.I.imm);
+                break;
+            }
+            case OP_8_IDIV:  
+            {
+                m.r[i.I.dest] = ((s8)m.r[i.I.op] / (s8)i.I.imm);
+                break;
+            }
+            case OP_8_IMOD:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] % (s8)i.I.imm);
+                break;
+            }
+            case OP_8_ISHIFT_R:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] >> (s8)i.I.imm);
+                break;
+            }
+            case OP_8_ISHIFT_L:  
+            {
+                m.r[i.I.dest] = (s8)((s8)m.r[i.I.op] << (s8)i.I.imm);
+                break;
+            }
             case OP_LOAD64:  
             {
                 m.r[i.I.dest] = ((s64*)m.r[i.I.op])[i.I.imm];
@@ -262,7 +332,6 @@ int main(s32 argc, c8** argv)
                 }
                 break;
             }
-
             case OP_TO_F64:
             {
                 m.fR[i.I.dest] = m.r[i.I.op];
@@ -292,26 +361,6 @@ int main(s32 argc, c8** argv)
             case OP_F_DIV:  
             {
                 m.fR[i.R.dest] = m.fR[i.R.op1] / m.fR[i.R.op2];
-                break;
-            }
-            case OP_F_CMP_AND:  
-            {
-                m.r[i.R.dest] = m.fR[i.R.op1] && m.fR[i.R.op2];
-                break;
-            }
-            case OP_F_CMP_OR:  
-            {
-                m.r[i.R.dest] = m.fR[i.R.op1] || m.fR[i.R.op2];
-                break;
-            }
-            case OP_F_CMP_EQ:  
-            {
-                m.r[i.R.dest] = m.fR[i.R.op1] == m.fR[i.R.op2];
-                break;
-            }
-            case OP_F_CMP_NEQ:  
-            {
-                m.r[i.R.dest] = m.fR[i.R.op1] != m.fR[i.R.op2];
                 break;
             }
             case OP_F_CMP_LT:  
@@ -344,36 +393,6 @@ int main(s32 argc, c8** argv)
                 m.fR[i.I.dest] = m.fR[i.I.op] / i.I.fImm;
                 break;
             }
-            case OP_LOADF:  
-            {
-                m.fR[i.I.dest] = ((f64*)m.r[i.I.op])[i.I.imm];
-                break;
-            }
-            case OP_STOREF:
-            {
-                ((f64*)m.r[i.I.dest])[i.I.imm] = m.fR[i.I.op];
-                break;
-            }
-            case OP_F_ICMP_AND:  
-            {
-                m.r[i.I.dest] = m.fR[i.I.op] && i.I.imm;
-                break;
-            }
-            case OP_F_ICMP_OR:  
-            {
-                m.r[i.I.dest] = m.fR[i.I.op] || i.I.imm;
-                break;
-            }
-            case OP_F_ICMP_EQ:  
-            {
-                m.r[i.I.dest] = m.fR[i.I.op] == i.I.imm;
-                break;
-            }
-            case OP_F_ICMP_NEQ:  
-            {
-                m.r[i.I.dest] = m.fR[i.I.op] != i.I.imm;
-                break;
-            }
             case OP_F_ICMP_LT:  
             {
                 m.r[i.I.dest] = m.fR[i.I.op] < i.I.imm;
@@ -382,22 +401,6 @@ int main(s32 argc, c8** argv)
             case OP_F_ICMP_GT:  
             {
                 m.r[i.I.dest] = m.fR[i.I.op] > i.I.imm;
-                break;
-            }
-            case OP_F_BEQ:  
-            {
-                if(m.fR[i.I.dest] == m.fR[i.I.op])
-                {
-                    m.r[R_PROG_CNT] += i.I.imm;
-                }
-                break;
-            }
-            case OP_F_BNE:  
-            {
-                if(m.fR[i.I.dest] != m.fR[i.I.op])
-                {
-                    m.r[R_PROG_CNT] += i.I.imm;
-                }
                 break;
             }
             case OP_JMP:  

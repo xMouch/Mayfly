@@ -1,53 +1,7 @@
 fn main(s64 argc, s64* argv) : s64
 {
-
-	/*
-		Multiline comment
-	*/
-	s64 test_var;
-	test_var = 25;
-	
-	f64 float = 0.5;
-	f64 float2 = 2;
-
-	s64 test_var2 = (5 + 12 - 2)/3;
-	
-	f64 a = test_var - float2; //23
-	s64 b = 5 - test_var; //-20
-	
-	s64 res = a * 2 / (-b / 2) + test_var; //29
-	return res;
-	
-	s64 test_var3 = test_var + test_var2; //30
-	
-	//c8* test = "Hi my name is What";
-
-
-    for(s64 i = 0; i < test_var3; i = i+1)
-    {
-
-        if( i < 2)
-        {
-            continue;
-        }
-        
-        if(test_var2 > 1000)
-        {
-            break;
-        }
-
-        test_var2 = test_var2 + 99;
-    }
-
-    return test_var2;
-    
-    if(test_var == 25)
-	{
-		return float;//test_var3 + 20; //50
-	}
-	else
-	{
-		return 42;
-	}
+    c8 var1 = 5;
+    s64 var2 = 10;
+    return var1 * var2 * var2;
 }
 
