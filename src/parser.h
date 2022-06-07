@@ -58,13 +58,15 @@ Node* derefChain(Node* child, msi count){
 }
 
 DataType convertNodes(Node** left, Node** right, bool assignment = false){
-    if((*left)->dataType != (*right)->dataType && ((*left)->dataType == F64 || (*right)->dataType == F64)){
+    if((*left)->dataType != (*right)->dataType){
         DataType resType = assignment?(*left)->dataType:(DataType)s64_max((*left)->dataType, (*right)->dataType);
-        if ((*left)->dataType != resType){
-            *left = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*left});
-        }
-        else{
-            *right = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*right});
+        if((*left)->dataType == F64 || (*right)->dataType == F64){
+            if ((*left)->dataType != resType){
+                *left = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*left});
+            }
+            else{
+                *right = makeNode({.type=dataTypeToConversionOp(resType),.dataType=resType,.left=*right});
+            }
         }
         return resType;
     }
