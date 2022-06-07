@@ -1256,12 +1256,12 @@ void gen_return(Node* node, Metadata* meta)
     Instr instr = {};
     if(expr_res.constant)
     {
-        if (expr_res.dataType==F64)
+        if (node->dataType==F64)
         {
             instr.I.opcode = OP_F_IADD;
             instr.I.fImm = expr_res.fValue;
         }
-        else if(expr_res.dataType==C8)
+        else if(node->dataType==C8)
         {
             instr.I.opcode = OP_8_IADD;
             instr.I.imm = get_value(expr_res);
@@ -1278,13 +1278,12 @@ void gen_return(Node* node, Metadata* meta)
     }
     else
     {
-        if(expr_res.dataType==C8)
+        if(node->dataType==C8)
         {
             instr.R.opcode = OP_8_ADD;
         }
         else
         {
-            
             instr.R.opcode = OP_ADD;
         }
         instr.R.dest = R_RETURN;

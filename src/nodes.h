@@ -78,7 +78,19 @@ struct Node{
     Node* left;
     Node* right;
 };
- 
+
+static
+String data_type_to_str(DataType dt)
+{
+    switch(dt)
+    {
+        case C8:  return IR_CONSTZ("C8");
+        case S64: return IR_CONSTZ("S64");
+        case F64:  return IR_CONSTZ("F64");
+        default: return IR_CONSTZ("DATA TYPE PRINT NOT IMPLEMENTED");
+    }
+}
+
 static
 String type_to_str(NodeType t)
 {

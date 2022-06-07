@@ -230,8 +230,8 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
             Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
             Node* right = expression();
-            convertNodes(&left, &right, true);
-            n = makeNode({.type=N_ASSIGN,.left=left,.right=right});
+            DataType dataType = convertNodes(&left, &right, true);
+            n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=left,.right=right});
         }
         else
             n = makeNode({.type=N_EMPTY});
@@ -244,10 +244,10 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
             if(accept('=')){
                 Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
                 Node* right = expression();
-                convertNodes(&left, &right, true);
+                DataType dataType = convertNodes(&left, &right, true);
                 if (left->dataType == F64 && pointerLvl>0)
                     operandError((Token_Type)'*',*left);
-                n = makeNode({.type=N_ASSIGN,.left=derefChain(left,pointerLvl),.right=right});
+                n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=derefChain(left,pointerLvl),.right=right});
             }else{
                 previousToken();
                 n = expression();
@@ -293,7 +293,7 @@ Node* function(c8 declaration){
         ARR_PUSH(p_functions,f);
         expect('{');
         increaseScope();
-        Node* n = makeNode({.type=N_FUNC,.func=ARR_LAST(p_functions), .left=statements()});
+        Node* n = makeNode({.type=N_FUNC,.func=ARR_LAST(p_functions), .dataType=tokenTypeToDatatype(f.returnType), .left=statements()});
         decreaseScope();
         expect('}');
         return n;
@@ -418,8 +418,8 @@ Node* statement(){
     }
     if (accept(TOKEN_RETURN)){
         Node* left = expression();
-        convertNode(tokenTypeToDatatype(ARR_LAST(p_functions)->returnType), &left);
-        n = makeNode({.type=N_RETURN, .left=left});
+        DataType dt = convertNode(tokenTypeToDatatype(ARR_LAST(p_functions)->returnType), &left);
+        n = makeNode({.type=N_RETURN, .dataType=dt, .left=left});
         expect(';');
         return n;
     }
@@ -543,7 +543,7 @@ Node* exp6(){
         }
         Node* right=exp4();
         convertNodes(&returnVal, &right);
-        returnVal = makeNode({.type=nodeType,.dataType=S64,.left=returnVal,.right=right}); //for cmp ops datatype of children is of importance
+        returnVal = makeNode({.type=nodeType,.dataType=C8,.left=returnVal,.right=right}); //for cmp ops datatype of children is of importance
     }
     return returnVal;
 }
@@ -628,8 +628,8 @@ Node* block(){
         if (accept('=')){
             Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
             Node* right = expression();
-            convertNodes(&left, &right, true);
-            node = makeNode({.type=N_ASSIGN,.left=left,.right=right});
+            DataType dt = convertNodes(&left, &right, true);
+            node = makeNode({.type=N_ASSIGN, .dataType=dt, .left=left,.right=right});
         }
         expect(';');
         return node;
@@ -656,16 +656,17 @@ void printTree(Node* n, s64 offset){
         printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
         if(n->type==N_VAR){
             printVar(*n->var);
-            printf("\n");
         }else if(n->type==N_FUNC){
             printf("%.*s %.*s (", type_to_str(n->type),n->func->name);
             for (msi i=0;i< ARR_LEN(n->func->arguments);i++)
                 printVar(n->func->arguments[i]);
-            printf(")\n");
+            printf(")");
         }else if(n->type==N_FLOAT)
-            printf("%.*s %f\n", type_to_str(n->type), n->fValue);
+            printf("%.*s %f", type_to_str(n->type), n->fValue);
         else
-            printf("%.*s %u\n", type_to_str(n->type), n->sValue);
+            printf("%.*s %u", type_to_str(n->type), n->sValue);
+        printf(" %.*s", data_type_to_str(n->dataType));
+        printf("\n");
         printTree(n->left, offset+1);
         printTree(n->right, offset+1);
     }
