@@ -1,7 +1,12 @@
+s64 var1 = 1;
 fn main(s64 argc, s64* argv) : c8
 {
     c8 var1 = 5;
     s64 var2 = 10;
-    return var1 * var2 * var2;
+	f64 fvar1 = 55.65;
+	s64 var3 = fvar1 * var2 * var2;
+	
+
+    return var1;
 }
 

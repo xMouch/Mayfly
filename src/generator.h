@@ -114,7 +114,8 @@ enum Opcode
     
     //Conversion
     OP_TO_F64,
-    OP_TO_S64,
+    OP_F64_TO_S64,
+    OP_F64_TO_C8,
     
     
     //LOAD/STORE
@@ -196,9 +197,10 @@ struct Metadata
     Meta_Function* funcs;
     Meta_Variable* var;
     
+    Instr main_jmp;
+    Instr* init_instr_list;
     Instr* instr_list; 
     String* line_to_instr_list;
-    
     
     
     Meta_Loop_Manip* loop_manips;
@@ -298,7 +300,8 @@ String opcode_to_str(Opcode opcode)
         case OP_STORE64:  return IR_CONSTZ("OP_STORE64");
         case OP_STORE8:  return IR_CONSTZ("OP_STORE8");
         case OP_TO_F64:  return IR_CONSTZ("OP_TO_F64");
-        case OP_TO_S64:  return IR_CONSTZ("OP_TO_S64");
+        case OP_F64_TO_S64:  return IR_CONSTZ("OP_F64_TO_S64");
+        case OP_F64_TO_C8:  return IR_CONSTZ("OP_F64_TO_C8");
         case OP_ICMP_AND:  return IR_CONSTZ("OP_ICMP_AND");
         case OP_ICMP_OR:  return IR_CONSTZ("OP_ICMP_OR");
         case OP_ICMP_EQ:  return IR_CONSTZ("OP_ICMP_EQ");
@@ -360,12 +363,59 @@ static bool is_commutative(Opcode opcode){
     }
 }
 
+static 
+void print_instr(Instr instr, msi line_num, FILE* dst)
+{
+    
+    // R TYPE
+    if(instr.R.opcode < OP_IADD)
+    {
+        fprintf(dst, "%llu:  %.*s %u %u %u\n", 
+                line_num,
+                opcode_to_str((Opcode)instr.R.opcode),
+                (u32)instr.R.dest,
+                (u32)instr.R.op1,
+                (u32)instr.R.op2);
+    }
+    //I TYPE
+    else if(instr.R.opcode < OP_JMP)
+    {
+        if (is_float_op((Opcode)instr.R.opcode)){
+            fprintf(dst, "%llu:  %.*s %u %u %f\n",
+                    line_num,
+                    opcode_to_str((Opcode)instr.I.opcode),
+                    (u32)instr.I.dest,
+                    (u32)instr.I.op,
+                    (f32)instr.I.fImm);
+        }
+        else{
+            fprintf(dst, "%llu:  %.*s %u %u %i\n",
+                    line_num,
+                    opcode_to_str((Opcode)instr.I.opcode),
+                    (u32)instr.I.dest,
+                    (u32)instr.I.op,
+                    (s32)instr.I.imm);
+        }
+    }
+    // J TYPE
+    else
+    {
+        fprintf(dst, "%llu:  %.*s %llu\n", 
+                line_num,
+                opcode_to_str((Opcode)instr.J.opcode),
+                (u64)instr.J.jmp);
+    }   
+}
+
 static
 void print_all_instr(Metadata* meta)
 {
     static FILE* dst = stdout;
     
     String prev_line = {};// meta->line_to_instr_list[0];
+    msi line_num = 0;
+    
+    meta->instr_list[0].J.jmp = ARR_LEN(meta->instr_list);
     
     
     for(msi i = 0; i < ARR_LEN(meta->instr_list); ++i)
@@ -378,57 +428,54 @@ void print_all_instr(Metadata* meta)
             fprintf(dst, "\033[32m%.*s\033[97m", prev_line);
         }
         
-        // R TYPE
-        if(instr.R.opcode < OP_IADD)
-        {
-            fprintf(dst, "%llu:  %.*s %u %u %u\n", 
-                    i,
-                    opcode_to_str((Opcode)instr.R.opcode),
-                    (u32)instr.R.dest,
-                    (u32)instr.R.op1,
-                    (u32)instr.R.op2);
-        }
-        //I TYPE
-        else if(instr.R.opcode < OP_JMP)
-        {
-            if (is_float_op((Opcode)instr.R.opcode)){
-                fprintf(dst, "%llu:  %.*s %u %u %f\n",
-                        i,
-                        opcode_to_str((Opcode)instr.I.opcode),
-                        (u32)instr.I.dest,
-                        (u32)instr.I.op,
-                        (f32)instr.I.fImm);
-            }
-            else{
-                fprintf(dst, "%llu:  %.*s %u %u %i\n",
-                        i,
-                        opcode_to_str((Opcode)instr.I.opcode),
-                        (u32)instr.I.dest,
-                        (u32)instr.I.op,
-                        (s32)instr.I.imm);
-            }
-        }
-        // J TYPE
-        else
-        {
-            fprintf(dst, "%llu:  %.*s %llu\n", 
-                    i,
-                    opcode_to_str((Opcode)instr.J.opcode),
-                    (u64)instr.J.jmp);
-        } 
+        print_instr(instr, line_num, dst);
+        line_num++;
+        
     }
+    
+    for(msi i = 0; i < ARR_LEN(meta->init_instr_list); ++i)
+    {   
+        print_instr(meta->init_instr_list[i], line_num, dst);
+        
+        line_num++;
+    }
+    
+    
+    print_instr(meta->main_jmp, line_num, dst);
+    
 }
 
 static
 void generate_binary(c8* binary_loc, Metadata* meta)
-{
+{   
     FILE* bin_file;
     bin_file = fopen(binary_loc, "wb");
+    
+    meta->instr_list[0].J.jmp = ARR_LEN(meta->instr_list);
+    
     msi result = fwrite(&meta->instr_list[0], sizeof(Instr) * ARR_LEN(meta->instr_list), 1, bin_file);
     
     if(!result)
     {
-        fprintf(stderr, "Error writing binary file!\n");
+        fprintf(stderr, "Error writing instr binary file!\n");
+    }
+    
+    if(ARR_LEN(meta->init_instr_list) > 0)
+    {
+        result = fwrite(&meta->init_instr_list[0], sizeof(Instr) * ARR_LEN(meta->init_instr_list), 1, bin_file);
+        
+        if(!result)
+        {
+            fprintf(stderr, "Error writing init func in binary file!\n");
+        }
+    }
+    
+    
+    result = fwrite(&meta->main_jmp, sizeof(Instr), 1, bin_file);
+    
+    if(!result)
+    {
+        fprintf(stderr, "Error writing main jmp in binary file!\n");
     }
     
     fclose(bin_file);
@@ -455,6 +502,13 @@ void gen_func(Node* node, Metadata* meta)
     
     meta->cur_func = ARR_PUSH(meta->funcs, mfunc);
     
+    
+    if(cmp_string(mfunc.func->name, IR_CONSTZ("main")))
+    {
+        meta->main_jmp = {};
+        meta->main_jmp.J.opcode = OP_JMP;
+        meta->main_jmp.J.jmp = mfunc.jmp_loc;
+    }
     
     if(node->left)
     {
@@ -719,7 +773,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 
                 if(res_left.tmp)
                 {
-                    instr.I.opcode = OP_TO_S64;
+                    instr.I.opcode = OP_F64_TO_S64;
                     instr.I.dest = res_left.value;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
@@ -728,7 +782,42 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 }
                 else
                 {
-                    instr.I.opcode = OP_TO_S64;
+                    instr.I.opcode = OP_F64_TO_S64;
+                    instr.I.dest =  meta->treg_cnt;;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    
+                    result.value = meta->treg_cnt;
+                    meta->treg_cnt++;
+                }
+                add_instr(instr, node->line_text, meta);
+            }
+            break;
+        }
+        case N_TO_C8:
+        {
+            if (res_left.constant){
+                result.value = (s8)get_value(res_left);
+                result.constant = true;
+                result.tmp = false;
+            }else{
+                result.tmp = true;
+                result.constant = false;
+                
+                Instr instr={};
+                
+                if(res_left.tmp)
+                {
+                    instr.I.opcode = OP_F64_TO_C8;
+                    instr.I.dest = res_left.value;
+                    instr.I.imm = 0;
+                    instr.I.op = res_left.value;
+                    result.value = res_left.value;
+                    //result.dataType = C8; //already set through node
+                }
+                else
+                {
+                    instr.I.opcode = OP_F64_TO_C8;
                     instr.I.dest =  meta->treg_cnt;;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
@@ -1578,11 +1667,17 @@ Metadata generate(Node* ast, msi reg_max, Heap_Allocator* heap)
 {
     Metadata meta = {};
     meta.treg_cnt = reg_max;
+    meta.main_jmp = {};
     ARR_INIT(meta.funcs, 64, heap);
     ARR_INIT(meta.var, 64, heap);
+    ARR_INIT(meta.init_instr_list, 32, heap);
     ARR_INIT(meta.instr_list, 128, heap);
     ARR_INIT(meta.line_to_instr_list, 128, heap);
     ARR_INIT(meta.loop_manips, 16, heap);
+    
+    Instr init_jmp = {};
+    init_jmp.J.opcode = OP_JMP;
+    add_instr(init_jmp, IR_CONSTZ("INIT_JMP\n"), &meta);
     
     if(ast)
     {

@@ -63,7 +63,7 @@ int main(s32 argc, c8** argv)
     
     b8 after_abs_jmp = false;
     
-    for(; m.r[R_PROG_CNT] < ARR_LEN(instr_list); ++m.r[R_PROG_CNT])
+    for(; m.r[R_PROG_CNT] < ARR_LEN(instr_list) || (after_abs_jmp && m.r[R_PROG_CNT] == ARR_LEN(instr_list)); ++m.r[R_PROG_CNT])
     {
         
         if(after_abs_jmp)
@@ -337,12 +337,16 @@ int main(s32 argc, c8** argv)
                 m.fR[i.I.dest] = m.r[i.I.op];
                 break;
             }
-            case OP_TO_S64:
+            case OP_F64_TO_S64:
             {
                 m.r[i.I.dest] = m.fR[i.I.op];
                 break;
             }
-            
+            case OP_F64_TO_C8:
+            {
+                m.r[i.I.dest] = (s8)m.fR[i.I.op];
+                break;
+            }
             case OP_F_ADD:
             {
                 m.fR[i.R.dest] = m.fR[i.R.op1] + m.fR[i.R.op2];
@@ -415,7 +419,8 @@ int main(s32 argc, c8** argv)
                 after_abs_jmp = true;
                 if(i.J.jmp == R_RETURN_ADDR && m.r[R_RETURN_ADDR] == (u64)-1)
                 {
-                    printf("Program END: %i\n", (s32)m.r[R_RETURN]);
+                    printf("Program int END: %i\n", (s32)m.r[R_RETURN]);
+                    printf("Program float END: %f\n", m.fR[R_RETURN]);
                     return m.r[R_RETURN];
                 }
                 break;

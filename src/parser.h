@@ -36,8 +36,9 @@ NodeType dataTypeToConversionOp(DataType d){
         case F64:
             return N_TO_F64;
         case S64:
-        case C8:
             return N_TO_S64;
+        case C8:
+            return N_TO_C8;
         default:
             IR_INVALID_CASE;
             return N_EMPTY;

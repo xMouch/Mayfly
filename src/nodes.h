@@ -29,6 +29,7 @@ enum NodeType{
     //
     N_TO_F64,
     N_TO_S64,
+    N_TO_C8,
     //
     N_IF,
     N_ELSE,
@@ -121,6 +122,7 @@ String type_to_str(NodeType t)
         case N_CMP_GEQ:  return IR_CONSTZ("N_CMP_GEQ");
         case N_TO_F64:  return IR_CONSTZ("N_TO_F64");
         case N_TO_S64:  return IR_CONSTZ("N_TO_S64");
+        case N_TO_C8:  return IR_CONSTZ("N_TO_C8");
         case N_IF:  return IR_CONSTZ("N_IF");
         case N_ELSE:  return IR_CONSTZ("N_ELSE");
         case N_FOR:  return IR_CONSTZ("N_FOR");
