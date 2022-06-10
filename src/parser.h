@@ -138,7 +138,7 @@ c8 expect(msi tokenType){
 //TOKEN_UNKNOWN->not a declaration; TOKEN_S64, TOKEN_F64, TOKEN_B8
 msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
     if (!declarationType){
-        for (msi i=0;i<ARR_LEN(p_variablesInScope);i++){
+        for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
             if (cmp_string(t.text,p_variablesInScope[i].name)){
                 return i;
             }
@@ -149,7 +149,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
         exit(EXIT_FAILURE);
     }
     else {
-        for (msi i=0;i<ARR_LEN(p_variablesInScope);i++){
+        for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
             if (cmp_string(t.text,p_variablesInScope[i].name) && p_currentScope == p_variablesInScope[i].level){
                 printf("Error, redeclared identifier: %.*s at %u:%u\n", t.text,
                        t.line,
