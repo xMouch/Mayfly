@@ -6,6 +6,8 @@ enum NodeType{
     N_ASSIGN,
     N_EXPR,
     N_FUNC,
+    N_FUNC_CALL,
+    N_FUNC_ARG,
     // OPERATORS
     N_OR,
     N_AND,
@@ -100,6 +102,8 @@ String type_to_str(NodeType t)
         case N_EXPR: return IR_CONSTZ("N_EXPR");
         case N_ASSIGN:  return IR_CONSTZ("N_ASSIGN");
         case N_FUNC:  return IR_CONSTZ("N_FUNC");
+        case N_FUNC_CALL:  return IR_CONSTZ("N_FUNC_CALL");
+        case N_FUNC_ARG:  return IR_CONSTZ("N_FUNC_ARG");
         case N_OR:  return IR_CONSTZ("N_OR");
         case N_AND:  return IR_CONSTZ("N_AND");
         case N_XOR:  return IR_CONSTZ("N_XOR");

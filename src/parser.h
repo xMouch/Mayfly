@@ -139,7 +139,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
     if (!declarationType){
         for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
             if (cmp_string(t.text,p_variablesInScope[i].name)){
-                return i;
+                return p_variablesInScope[i].id;
             }
         }
         printf("Error, undeclared identifier: %.*s at %u:%u\n", t.text,
@@ -265,9 +265,12 @@ Node* function(c8 declaration){
     if (declaration){
         Token_Type t;
         Function f{};
+        msi line = p_currentToken->line;
+        msi column = p_currentToken->column;
         expect(TOKEN_FN);
         expect(TOKEN_ID);
         f.name = getPreviousToken(1).text;
+        increaseScope();
         ARR_INIT(f.arguments,4,p_heap);
         expect('(');
         if ((t=acceptType()) != TOKEN_UNKOWN){
@@ -290,24 +293,72 @@ Node* function(c8 declaration){
         expect(')');
         expect(':');
         f.returnType = expectType(); //no support for void return
+        for (msi i = 0; i<ARR_LEN(p_functions); i++){
+            if (cmp_string(p_functions[i].name, f.name)){
+                printf("Error, redeclared function at %llu:%llu\n", line, column);
+                exit(1);
+            }
+        }
         ARR_PUSH(p_functions,f);
         expect('{');
-        increaseScope();
         Node* n = makeNode({.type=N_FUNC,.func=ARR_LAST(p_functions), .dataType=tokenTypeToDatatype(f.returnType), .left=statements()});
         decreaseScope();
         expect('}');
         return n;
     } else {
-        //TODO: function signature checking requires knowledge of expression type; node datatype
         expect(TOKEN_ID);
-        expect('(');
-        if(!accept(')'))
-            expression();
-        while (accept(',')){
-            expression();
+        Function* f = nullptr;
+        for (msi i = 0; i<ARR_LEN(p_functions); i++){
+            if (cmp_string(p_functions[i].name, getPreviousToken(1).text)){
+                f = &p_functions[i];
+            }
         }
-        expect(')');
-        return nullptr;
+        if (f == nullptr){
+            printf("Error, unknown function %.*s\n", getPreviousToken(1).text);
+            exit(1);
+        }
+        Node* n = makeNode({.type=N_FUNC_CALL,.func=f, .dataType=tokenTypeToDatatype(f->returnType)});
+        msi currentParam = 0;
+        expect('(');
+        if(!accept(')')){
+            Node* argument = expression();
+            if (ARR_LEN(f->arguments)<=currentParam){
+                printf("Error, unexpected arguments for function call at %llu:%llu\n",
+                       getPreviousToken(1).line,
+                       getPreviousToken(1).column);
+                exit(1);
+            }
+            if (argument->dataType != tokenTypeToDatatype(f->arguments[currentParam].dataType)){
+                convertNode(tokenTypeToDatatype(f->arguments[currentParam].dataType), &argument);
+            }
+            n->left = makeNode({.type=N_FUNC_ARG, .dataType=argument->dataType, .left=argument});
+            argument = n->left;
+            currentParam++;
+
+            while (accept(',')){
+                Node* argument2 = expression();
+                if (ARR_LEN(f->arguments)<=currentParam){
+                    printf("Error, unexpected arguments for function call at %llu:%llu\n",
+                           getPreviousToken(1).line,
+                           getPreviousToken(1).column);
+                    exit(1);
+                }
+                if (argument2->dataType != tokenTypeToDatatype(f->arguments[currentParam].dataType)){
+                    convertNode(tokenTypeToDatatype(f->arguments[currentParam].dataType), &argument2);
+                }
+                argument->right = makeNode({.type=N_FUNC_ARG, .dataType=argument2->dataType, .left=argument2});
+                argument = argument->right;
+                currentParam++;
+            }
+            expect(')');
+        }
+        if (currentParam < ARR_LEN(f->arguments)){
+            printf("Error, missing arguments for function call at %llu:%llu\n",
+                   getPreviousToken(1).line,
+                   getPreviousToken(1).column);
+            exit(1);
+        }
+        return n;
     }
 }
 
@@ -446,7 +497,7 @@ Node* term(){
         }
         else{
             msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
-                return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=tokenTypeToDatatype(p_variables[index].dataType)});
         }
     }
     else if (accept(TOKEN_NUM)){
@@ -656,7 +707,7 @@ void printTree(Node* n, s64 offset){
         printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
         if(n->type==N_VAR){
             printVar(*n->var);
-        }else if(n->type==N_FUNC){
+        }else if(n->type==N_FUNC||n->type==N_FUNC_CALL){
             printf("%.*s %.*s (", type_to_str(n->type),n->func->name);
             for (msi i=0;i< ARR_LEN(n->func->arguments);i++)
                 printVar(n->func->arguments[i]);
