@@ -60,6 +60,8 @@ struct Function{
     Token_Type returnType;
     String name;
     Variable* arguments;
+    
+    msi jmp_loc;
 };
 
 enum DataType{

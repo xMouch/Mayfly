@@ -1,0 +1,27 @@
+before call:
+
+ 
+push	R_FRAME_PTR 
+push	R_RETURN_ADDR
+set 	R_FRAME_PTR to R_STACK_PTR
+push    ARGS
+set     R_RETURN_ADDR to R_PROG_CNT + 1;
+jmp
+
+	
+
+on return:
+
+set R_RETURN to return value
+set R_STACK_PTR to R_FRAME_PTR:
+jmp to R_RETURN_ADDR
+
+
+after call:
+pop R_RETURN_ADDR to R_RETURN_ADDR
+pop R_FRAME_PTR to R_FRAME_PTR
+
+
+
+
+

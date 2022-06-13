@@ -15,7 +15,7 @@ First 10 registers are reserved:
 
 0 .. zero reg
 1 .. program counter
-2 .. return addr
+2 .. return address
 3 .. return reg
 4 .. frame_ptr
 5 .. stack_ptr
@@ -169,15 +169,6 @@ union Instr
 
 #pragma pack(pop)
 
-
-
-
-struct Meta_Function
-{
-    Function* func;
-    msi jmp_loc;
-};
-
 struct Meta_Variable
 {
     Variable* var;
@@ -194,7 +185,6 @@ struct Meta_Loop_Manip
 
 struct Metadata
 {
-    Meta_Function* funcs;
     Meta_Variable* var;
     
     Instr main_jmp;
@@ -205,7 +195,7 @@ struct Metadata
     
     Meta_Loop_Manip* loop_manips;
     
-    Meta_Function* cur_func;
+    Function* cur_func;
     msi cur_line;
     msi treg_cnt;
     msi cur_loop_id;
@@ -481,6 +471,12 @@ void generate_binary(c8* binary_loc, Metadata* meta)
     fclose(bin_file);
 }
 
+static 
+void add_init_instr(Instr instr, String cur_line, Metadata* meta)
+{
+    ARR_PUSH(meta->init_instr_list, instr);
+}
+
 static
 void add_instr(Instr instr, String cur_line, Metadata* meta)
 {
@@ -496,18 +492,18 @@ static void gen_node(Node* node, Metadata* meta);
 static 
 void gen_func(Node* node, Metadata* meta)
 {
-    Meta_Function mfunc = {};
-    mfunc.func = node->func;
-    mfunc.jmp_loc = meta->cur_line;
+    node->func->jmp_loc = meta->cur_line;
     
-    meta->cur_func = ARR_PUSH(meta->funcs, mfunc);
+    IR_ASSERT(meta->cur_func == nullptr);
+    
+    meta->cur_func = node->func;
     
     
-    if(cmp_string(mfunc.func->name, IR_CONSTZ("main")))
+    if(cmp_string(node->func->name, IR_CONSTZ("main")))
     {
         meta->main_jmp = {};
         meta->main_jmp.J.opcode = OP_JMP;
-        meta->main_jmp.J.jmp = mfunc.jmp_loc;
+        meta->main_jmp.J.jmp = node->func->jmp_loc;
     }
     
     if(node->left)
@@ -718,6 +714,167 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
 }
 
 static 
+void gen_push_8(u8 reg, Node* node, Metadata* meta)
+{
+    
+    // R_STACK_PTR[imm] = reg;
+    Instr instr = {};
+    instr.I.opcode = OP_STORE8;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = reg;
+    instr.I.imm = 0;
+    add_instr(instr, node->line_text, meta);
+    
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = 1;
+    add_instr(instr, node->line_text, meta);
+    
+}
+
+static 
+void gen_push_64(u8 reg, Node* node, Metadata* meta)
+{
+    
+    // R_STACK_PTR[imm] = reg;
+    Instr instr = {};
+    instr.I.opcode = OP_STORE64;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = reg;
+    instr.I.imm = 0;
+    add_instr(instr, node->line_text, meta);
+    
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = 8;
+    add_instr(instr, node->line_text, meta);
+    
+}
+
+static 
+void gen_pop_8(u8 reg, Node* node, Metadata* meta)
+{
+    
+    //dest = R_STACK_PTR[imm];
+    Instr instr = {};
+    instr.I.opcode = OP_LOAD8;
+    instr.I.dest = reg;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = -1;
+    add_instr(instr, node->line_text, meta);
+    
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = -1;
+    add_instr(instr, node->line_text, meta);
+    
+}
+
+static 
+void gen_pop_64(u8 reg, Node* node, Metadata* meta)
+{
+    
+    // R_STACK_PTR[imm] = reg;
+    Instr instr = {};
+    instr.I.opcode = OP_LOAD64;
+    instr.I.dest = reg;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = -8;
+    add_instr(instr, node->line_text, meta);
+    
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_STACK_PTR;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = -8;
+    add_instr(instr, node->line_text, meta);
+    
+}
+
+static Expr_Result gen_expr(Node* node, Metadata* meta);
+
+static 
+Expr_Result gen_func_call(Node* node, Metadata* meta)
+{
+    Function* func = node->func;
+    DataType ret_type = node->dataType;
+    msi num_args = ARR_LEN(func->arguments);
+    Expr_Result result = {};
+    
+    Expr_Result* arg_expr = nullptr;
+    ARR_INIT(arg_expr, 4, arr_header(meta->instr_list)->heap);
+    
+    Node* cur_arg = node->left;
+    for(msi i = 0; i < num_args; ++i)
+    {
+        Expr_Result arg_result = gen_expr(cur_arg->left, meta);
+        if(arg_result.constant)
+        {
+            Instr instr = {};
+            instr.I.opcode = OP_IADD;
+            instr.I.dest = meta->treg_cnt;
+            instr.I.op = R_ZERO;
+            instr.I.imm = arg_result.value;
+            
+            meta->treg_cnt++;
+            add_instr(instr, node->line_text, meta);   
+        }
+        ARR_PUSH(arg_expr, arg_result);
+        cur_arg = cur_arg->right;
+    }
+    
+    
+    gen_push_64(R_FRAME_PTR, node, meta);
+    gen_push_64(R_RETURN_ADDR, node, meta);
+    
+    Instr instr = {};
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_FRAME_PTR;
+    instr.I.op = R_STACK_PTR;
+    instr.I.imm = 0;
+    add_instr(instr, node->line_text, meta);
+    
+    for(msi i = 0; i < num_args; ++i)
+    {
+        Variable var = func->arguments[i];
+        
+        switch(var.dataType)
+        {
+            case TOKEN_C8:
+            {
+                gen_push_8(arg_expr[i].value, node, meta);
+                break;   
+            }
+            default:
+            {
+                gen_push_64(arg_expr[i].value, node, meta);
+                break;
+            }
+        }
+        
+    }
+    
+
+    instr.I.opcode = OP_IADD;
+    instr.I.dest = R_RETURN_ADDR;
+    instr.I.op = R_PROG_CNT +1;
+    instr.I.imm = 0;
+    add_instr(instr, node->line_text, meta);
+    
+    instr = {};
+    instr.J.opcode = OP_JMP;
+    instr.J.jmp = func->jmp_loc;
+    add_instr(instr, node->line_text, meta);
+    
+    
+    result.dataType = ret_type;
+    ARR_FREE(arg_expr);
+    return result;
+}
+
+static 
 Expr_Result gen_expr(Node* node, Metadata* meta)
 {
     Expr_Result res_left = {};
@@ -737,6 +894,11 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
         {
             result = res_left;
             break;
+        }
+        case N_FUNC_CALL:
+        {
+            result = gen_func_call(node, meta);
+            break;   
         }
         case N_NUM:
         {
@@ -783,7 +945,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 else
                 {
                     instr.I.opcode = OP_F64_TO_S64;
-                    instr.I.dest =  meta->treg_cnt;;
+                    instr.I.dest =  meta->treg_cnt;
                     instr.I.imm = 0;
                     instr.I.op = res_left.value;
                     
@@ -1231,7 +1393,14 @@ void gen_assign(Node* node, Metadata* meta)
         instr.I.op = R_ZERO;
         instr.I.shift = 0;
         
-        add_instr(instr, node->line_text, meta);
+        if(meta->cur_func == nullptr)
+        {
+            add_init_instr(instr, node->line_text, meta);
+        }
+        else
+        {
+            add_instr(instr, node->line_text, meta);
+        }
     }
     else if(!expr_result.tmp){
         if (isFloat)
@@ -1251,7 +1420,14 @@ void gen_assign(Node* node, Metadata* meta)
         instr.I.imm = R_ZERO;
         instr.I.shift = 0;
         
-        add_instr(instr, node->line_text, meta);
+        if(meta->cur_func == nullptr)
+        {
+            add_init_instr(instr, node->line_text, meta);
+        }
+        else
+        {
+            add_instr(instr, node->line_text, meta);
+        }
     }
     else
     {
@@ -1264,7 +1440,14 @@ void gen_assign(Node* node, Metadata* meta)
             instr.I.imm = R_ZERO;
             instr.I.shift = 0;
             
-            add_instr(instr, node->line_text, meta);
+            if(meta->cur_func == nullptr)
+            {
+                add_init_instr(instr, node->line_text, meta);
+            }
+            else
+            {
+                add_instr(instr, node->line_text, meta);
+            }
         }
         else
         {
@@ -1601,6 +1784,11 @@ void gen_node(Node* node, Metadata* meta)
     
     switch(node->type)
     {
+        case N_EXPR:
+        {
+            gen_expr(node, meta);
+            break;
+        }
         case N_FUNC:
         {
             gen_func(node, meta);
@@ -1641,8 +1829,21 @@ void gen_node(Node* node, Metadata* meta)
             gen_continue(node, meta);
             break;   
         }
-        case N_STMNT:
         case N_BLOCK:
+        {
+            meta->cur_func = nullptr;
+            if(node->left)
+            {
+                gen_node(node->left, meta);
+            }
+            
+            if(node->right)
+            { 
+                gen_node(node->right, meta);
+            }
+            break;   
+        }
+        case N_STMNT:
         case N_EMPTY:
         default:
         {
@@ -1668,7 +1869,6 @@ Metadata generate(Node* ast, msi reg_max, Heap_Allocator* heap)
     Metadata meta = {};
     meta.treg_cnt = reg_max;
     meta.main_jmp = {};
-    ARR_INIT(meta.funcs, 64, heap);
     ARR_INIT(meta.var, 64, heap);
     ARR_INIT(meta.init_instr_list, 32, heap);
     ARR_INIT(meta.instr_list, 128, heap);
