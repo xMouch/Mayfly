@@ -159,7 +159,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
         }
         Variable v{};
         v.level = p_currentScope;
-        v.dataType = declarationType;
+        v.dataType = tokenTypeToDatatype(declarationType);
         v.id = ARR_LEN(p_variables);
         v.name = t.text;
         v.pointerLvl = pointerLvl;
@@ -229,7 +229,7 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         msi index = expectId(varType, pointerLvl);
 
         if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
-            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].dataType});
             Node* right = expression();
             DataType dataType = convertNodes(&left, &right, true);
             n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=left,.right=right});
@@ -243,7 +243,7 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         if (acceptId(TOKEN_UNKOWN, pointerLvl)){
             msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
             if(accept('=')){
-                Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+                Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].dataType});
                 Node* right = expression();
                 DataType dataType = convertNodes(&left, &right, true);
                 if (left->dataType == F64 && pointerLvl>0)
@@ -329,8 +329,8 @@ Node* function(c8 declaration){
                        getPreviousToken(1).column);
                 exit(1);
             }
-            if (argument->dataType != tokenTypeToDatatype(f->arguments[currentParam].dataType)){
-                convertNode(tokenTypeToDatatype(f->arguments[currentParam].dataType), &argument);
+            if (argument->dataType != f->arguments[currentParam].dataType){
+                convertNode(f->arguments[currentParam].dataType, &argument);
             }
             n->left = makeNode({.type=N_FUNC_ARG, .dataType=argument->dataType, .left=argument});
             argument = n->left;
@@ -344,8 +344,8 @@ Node* function(c8 declaration){
                            getPreviousToken(1).column);
                     exit(1);
                 }
-                if (argument2->dataType != tokenTypeToDatatype(f->arguments[currentParam].dataType)){
-                    convertNode(tokenTypeToDatatype(f->arguments[currentParam].dataType), &argument2);
+                if (argument2->dataType != f->arguments[currentParam].dataType){
+                    convertNode(f->arguments[currentParam].dataType, &argument2);
                 }
                 argument->right = makeNode({.type=N_FUNC_ARG, .dataType=argument2->dataType, .left=argument2});
                 argument = argument->right;
@@ -498,7 +498,7 @@ Node* term(){
         }
         else{
             msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
-            return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=p_variables[index].dataType});
         }
     }
     else if (accept(TOKEN_NUM)){
@@ -678,7 +678,7 @@ Node* block(){
             pointerLvl++;
         msi index = expectId(t, pointerLvl);
         if (accept('=')){
-            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=tokenTypeToDatatype(p_variables[index].dataType)});
+            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].dataType});
             Node* right = expression();
             DataType dt = convertNodes(&left, &right, true);
             node = makeNode({.type=N_ASSIGN, .dataType=dt, .left=left,.right=right});
