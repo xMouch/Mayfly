@@ -47,8 +47,12 @@ enum NodeType{
     N_VAR
 };
 
+enum DataType{
+    C8, S64, F64
+};
+
 struct Variable{
-    Token_Type dataType; //only 1050-1099 allowed
+    DataType dataType;
     msi pointerLvl; //0 -> not a pointer
     String name;
     msi id;
@@ -59,10 +63,6 @@ struct Function{
     Token_Type returnType;
     String name;
     Variable* arguments;
-};
-
-enum DataType{
-    C8, S64, F64
 };
 
 struct Node{
