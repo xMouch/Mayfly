@@ -49,10 +49,13 @@ R(Machine m, u32 reg)
     {
         reg -= R_FIRST_LOCAL;
         u64 context = m.r[0][R_CONTEXT];
-        
         if(ARR_LEN(m.r) <= context)
         {
             ARR_INS(m.r, context, nullptr);
+        }
+        
+        if(m.r[context] == nullptr)
+        {
             ARR_INIT(m.r[context], 16, arr_header(m.r)->heap);
         }
         
@@ -67,7 +70,7 @@ R(Machine m, u32 reg)
 f64*
 RF(Machine m, u32 reg)
 { 
-    return (f64*)((void*)R(m, reg));
+    return (f64*)(void*)R(m, reg);
 }
 
 int main(s32 argc, c8** argv)
@@ -92,7 +95,7 @@ int main(s32 argc, c8** argv)
     Machine m = {};
     ARR_INIT(m.r, 16, &heap);
     ARR_PUSH(m.r, nullptr);
-    ARR_INIT(m.r[0], 16, arr_header(m.r)->heap);
+    ARR_INIT(m.r[0], 0, arr_header(m.r)->heap);
     *R(m, R_ZERO) = 0;
     *R(m, R_PROG_CNT) = 0;
     *R(m, R_RETURN) = 0;

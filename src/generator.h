@@ -848,9 +848,6 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     IR_ASSERT(num_args > 128 - R_FIRST_ARG && "Too many arguments!");
     Expr_Result result = {};
     
-    Expr_Result* arg_expr = nullptr;
-    ARR_INIT(arg_expr, 4, arr_header(meta->instr_list)->heap);
-    
     Node* cur_arg = node->left;
     for(msi i = 0; i < num_args; ++i)
     {
@@ -859,14 +856,15 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
         {
             Instr instr = {};
             instr.I.opcode = OP_IADD;
-            instr.I.dest = meta->treg_cnt;
+            instr.I.dest = R_FIRST_ARG + i;
             instr.I.op = R_ZERO;
             instr.I.imm = arg_result.value;
-            
-            meta->treg_cnt++;
             add_instr(instr, node->line_text, meta);   
         }
-        ARR_PUSH(arg_expr, arg_result);
+        else
+        {
+            meta->last_gen_instr->I.dest = R_FIRST_ARG + i;
+        }
         cur_arg = cur_arg->right;
     }
     
@@ -874,38 +872,10 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     Instr instr = {};
     
     instr.I.opcode = OP_IADD;
-    instr.I.imm = 1;
+    instr.I.imm = 2;
     instr.I.op = R_PROG_CNT;
     instr.I.dest = R_RETURN_ADDR;
     add_instr(instr, node->line_text, meta);
-    
-    for(msi i = 0; i < num_args; ++i)
-    {
-        Variable var = func->arguments[i];
-        
-        switch(var.dataType)
-        {
-            case C8:
-            {
-                instr.I.opcode = OP_8_IADD;
-                instr.I.imm = 0;
-                instr.I.op = arg_expr[i].value;
-                instr.I.dest = R_FIRST_ARG + i;
-                add_instr(instr, node->line_text, meta);
-                break;   
-            }
-            default:
-            {
-                instr.I.opcode = OP_IADD;
-                instr.I.imm = 0;
-                instr.I.op = arg_expr[i].value;
-                instr.I.dest = R_FIRST_ARG + i;
-                add_instr(instr, node->line_text, meta);
-                break;
-            }
-        }
-        
-    }
     
     instr = {};
     instr.J.opcode = OP_JMP;
@@ -932,7 +902,6 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     result.tmp = true;
     result.constant = false;
     result.dataType = ret_type;
-    ARR_FREE(arg_expr);
     return result;
 }
 

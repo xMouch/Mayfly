@@ -111,8 +111,19 @@ void* arr_insert_n_helper(void* arr, msi elem_size, msi index, msi n)
     u8* start = ((u8*)arr) + (index*elem_size);
     msi size = (header->length - index) * elem_size;
     msi offset = n * elem_size;
-    copy_buffer_reverse(IR_WRAP_INTO_BUFFER(start, size), IR_WRAP_INTO_BUFFER(start+offset, size));
-    header->length+=n;
+    
+    if(index >= header->length)
+    {
+        zero_buffer(IR_WRAP_INTO_BUFFER(((u8*)arr)+(header->length * elem_size),
+                                        (index - header->length) * elem_size));
+        header->length = index + n;
+    }
+    else
+    {
+        copy_buffer_reverse(IR_WRAP_INTO_BUFFER(start, size), IR_WRAP_INTO_BUFFER(start+offset, size));
+        header->length+=n;
+    }
+    
     
     return arr;    
 }

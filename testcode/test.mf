@@ -1,8 +1,10 @@
+fn add(s64 a, s64 b) : s64
+{
+	return a + b;
+}
+
 fn main() : s64
 {
-
-    f64 var1 = 5;
-
-
-    return var1;
+	s64 var1 = 1;
+    return add(42 + var1, 55);
 }
