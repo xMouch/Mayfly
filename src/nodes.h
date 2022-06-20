@@ -58,14 +58,14 @@ struct Variable{
     String name;
     msi id;
     msi level;
-    
     msi global_loc; // is -1 when not global
+    msi reg;
 };
 
 struct Function{
     Token_Type returnType;
     String name;
-    Variable* arguments;
+    Variable** arguments;
     
     msi jmp_loc;
     msi context_num;

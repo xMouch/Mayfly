@@ -10,7 +10,7 @@ c8 p_parsing;
 
 Node* p_nodes;
 Variable* p_variables;
-Variable* p_variablesInScope;
+Variable** p_variablesInScope;
 msi p_currentScope;
 
 msi global_cnt = 0;
@@ -91,7 +91,7 @@ void increaseScope(){
 }
 
 void decreaseScope(){
-    while(ARR_LAST(p_variablesInScope)->level==p_currentScope)
+    while((*ARR_LAST(p_variablesInScope))->level==p_currentScope)
         ARR_POP(p_variablesInScope);
     p_currentScope--;
 }
@@ -141,8 +141,8 @@ c8 expect(msi tokenType){
 msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal = false){
     if (!declarationType){
         for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
-            if (cmp_string(t.text,p_variablesInScope[i].name)){
-                return p_variablesInScope[i].id;
+            if (cmp_string(t.text,p_variablesInScope[i]->name)){
+                return p_variablesInScope[i]->id;
             }
         }
         printf("Error, undeclared identifier: %.*s at %u:%u\n", t.text,
@@ -152,7 +152,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal =
     }
     else {
         for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
-            if (cmp_string(t.text,p_variablesInScope[i].name) && p_currentScope == p_variablesInScope[i].level){
+            if (cmp_string(t.text,p_variablesInScope[i]->name) && p_currentScope == p_variablesInScope[i]->level){
                 printf("Error, redeclared identifier: %.*s at %u:%u\n", t.text,
                        t.line,
                        p_parsing ? t.column : t.column + t.text.length);
@@ -174,7 +174,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal =
             v.global_loc = (msi)-1;
         }
         ARR_PUSH(p_variables,v);
-        ARR_PUSH(p_variablesInScope,v);
+        ARR_PUSH(p_variablesInScope, ARR_LAST(p_variables));
         return v.id;
     }
 }
@@ -289,16 +289,16 @@ Node* function(c8 declaration){
             while (accept('*'))
                 pointerLvl++;
             expectId(t, pointerLvl);
-            Variable* v = ARR_LAST(p_variablesInScope);
-            ARR_PUSH(f.arguments, *v);
+            Variable* v = *ARR_LAST(p_variablesInScope);
+            ARR_PUSH(f.arguments, v);
             while (accept(',')){
                 t = expectType();
                 pointerLvl = 0;
                 while (accept('*'))
                     pointerLvl++;
                 expectId(t, pointerLvl);
-                v = ARR_LAST(p_variablesInScope);
-                ARR_PUSH(f.arguments, *v);
+                v = *ARR_LAST(p_variablesInScope);
+                ARR_PUSH(f.arguments, v);
             }
         }
         expect(')');
@@ -339,8 +339,8 @@ Node* function(c8 declaration){
                        getPreviousToken(1).column);
                 exit(1);
             }
-            if (argument->dataType != f->arguments[currentParam].dataType){
-                convertNode(f->arguments[currentParam].dataType, &argument);
+            if (argument->dataType != f->arguments[currentParam]->dataType){
+                convertNode(f->arguments[currentParam]->dataType, &argument);
             }
             n->left = makeNode({.type=N_FUNC_ARG, .dataType=argument->dataType, .left=argument});
             argument = n->left;
@@ -354,8 +354,8 @@ Node* function(c8 declaration){
                            getPreviousToken(1).column);
                     exit(1);
                 }
-                if (argument2->dataType != f->arguments[currentParam].dataType){
-                    convertNode(f->arguments[currentParam].dataType, &argument2);
+                if (argument2->dataType != f->arguments[currentParam]->dataType){
+                    convertNode(f->arguments[currentParam]->dataType, &argument2);
                 }
                 argument->right = makeNode({.type=N_FUNC_ARG, .dataType=argument2->dataType, .left=argument2});
                 argument = argument->right;
@@ -721,7 +721,7 @@ void printTree(Node* n, s64 offset){
         }else if(n->type==N_FUNC||n->type==N_FUNC_CALL){
             printf("%.*s %.*s (", type_to_str(n->type),n->func->name);
             for (msi i=0;i< ARR_LEN(n->func->arguments);i++)
-                printVar(n->func->arguments[i]);
+                printVar(*n->func->arguments[i]);
             printf(")");
         }else if(n->type==N_FLOAT)
             printf("%.*s %f", type_to_str(n->type), n->fValue);

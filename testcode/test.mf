@@ -1,10 +1,22 @@
-fn add(s64 a, s64 b) : s64
+fn just_nothing(s64 a) : s64
 {
-	return a + b;
+	return a;
 }
 
-fn main() : s64
+fn real_add(s64 a, s64 b) : s64
 {
-	s64 var1 = 1;
-    return add(42 + var1, 55);
+	return just_nothing(b) + just_nothing(a);
+}
+
+fn add(s64 a, s64 b) : s64
+{
+	return real_add(a, b);
+}
+
+f64 gvar = just_nothing(5);
+c8 gvar2 = add(real_add(4, 2), gvar);
+
+fn main(s64 argc, s64* argv) : s64
+{
+    return gvar2;
 }

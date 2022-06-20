@@ -106,8 +106,17 @@ b8 arr_del_n_helper(void* arr, msi elem_size, msi index, msi n)
 inline
 void* arr_insert_n_helper(void* arr, msi elem_size, msi index, msi n)
 {
-    arr = arr_maybe_growth_helper(arr, elem_size, n);
+    
     Dyn_Array_Header* header = arr_header(arr);
+    if(index >= header->length)
+    {
+        arr = arr_maybe_growth_helper(arr, elem_size, index - header->length + n);
+    }
+    else
+    {
+        arr = arr_maybe_growth_helper(arr, elem_size, n);
+    }
+    header = arr_header(arr);
     u8* start = ((u8*)arr) + (index*elem_size);
     msi size = (header->length - index) * elem_size;
     msi offset = n * elem_size;

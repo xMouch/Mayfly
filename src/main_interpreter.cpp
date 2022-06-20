@@ -95,7 +95,7 @@ int main(s32 argc, c8** argv)
     Machine m = {};
     ARR_INIT(m.r, 16, &heap);
     ARR_PUSH(m.r, nullptr);
-    ARR_INIT(m.r[0], 0, arr_header(m.r)->heap);
+    ARR_INIT(m.r[0], 16, arr_header(m.r)->heap);
     *R(m, R_ZERO) = 0;
     *R(m, R_PROG_CNT) = 0;
     *R(m, R_RETURN) = 0;
