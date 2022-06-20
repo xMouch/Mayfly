@@ -131,6 +131,8 @@ enum Opcode
     
     //C_TYPE
     OP_WRITE_CONSTANT,
+    OP_BUILTIN,
+    OP_CREATE_CONTEXT,
     
     /*
     //STACK
@@ -210,8 +212,9 @@ struct Metadata
     Function* cur_func;
     msi cur_line;
     msi cur_local_reg;
+    msi cur_init_reg;
     msi cur_global_reg;
-    msi context_cnt;
+    //msi context_cnt;
     msi cur_loop_id;
 };
 
@@ -331,6 +334,8 @@ String opcode_to_str(Opcode opcode)
         case OP_8_ISHIFT_R:  return IR_CONSTZ("OP_8_ISHIFT_R");
         case OP_8_ISHIFT_L:  return IR_CONSTZ("OP_8_ISHIFT_L");
         case OP_WRITE_CONSTANT:  return IR_CONSTZ("OP_WRITE_CONSTANT");
+        case OP_BUILTIN:  return IR_CONSTZ("OP_BUILTIN");
+        case OP_CREATE_CONTEXT:  return IR_CONSTZ("OP_CREATE_CONTEXT");
         default: return IR_CONSTZ("OPCODE PRINT NOT IMPLEMENTED");
     }
 }
@@ -476,9 +481,9 @@ void print_instr(Instr instr, msi line_num, FILE* dst)
         else
         {
             fprintf(dst, "%llu:  %.*s #%llu\n", 
-                 line_num,
-                 opcode_to_str((Opcode)instr.J.opcode),
-                 (u64)instr.J.jmp); 
+                    line_num,
+                    opcode_to_str((Opcode)instr.J.opcode),
+                    (u64)instr.J.jmp); 
         }
         
     }  
@@ -588,7 +593,14 @@ u32 get_reg(Metadata* meta, Variable* var = nullptr)
         }
         else if(var->global_loc == (msi)-1)
         {
-            result = R_FIRST_LOCAL + meta->cur_local_reg++;
+            if(meta->cur_func == nullptr)
+            {
+                result = R_FIRST_LOCAL + meta->cur_init_reg++;
+            }
+            else
+            {
+                result = R_FIRST_LOCAL + meta->cur_local_reg++;
+            }
         }
         else
         {
@@ -598,7 +610,14 @@ u32 get_reg(Metadata* meta, Variable* var = nullptr)
     }
     else 
     {
-        result =  R_FIRST_LOCAL + meta->cur_local_reg++;
+        if(meta->cur_func == nullptr)
+        {
+            result =  R_FIRST_LOCAL + meta->cur_init_reg++;
+        }
+        else
+        {
+            result =  R_FIRST_LOCAL + meta->cur_local_reg++;
+        }
     }
     
     return result;
@@ -610,19 +629,22 @@ static
 void gen_func(Node* node, Metadata* meta)
 {
     node->func->jmp_loc = meta->cur_line;
-    node->func->context_num = meta->context_cnt++;
     
     IR_ASSERT(meta->cur_func == nullptr);
     
     meta->cur_func = node->func;
-    meta->cur_local_reg = 1;
+    meta->cur_local_reg = 2;
+    
+    String func_name_with_line_break = alloc_and_concat_string(node->func->name,
+                                                               IR_CONSTZ("\n"),
+                                                               arr_header(meta->loop_manips)->heap->arena);
     
     Instr instr = {};
     
-    instr.C.opcode = OP_WRITE_CONSTANT;
-    instr.C.imm = meta->cur_func->context_num;
-    instr.C.dest = R_CONTEXT;
-    add_instr(instr, node->line_text, meta);
+    instr.C.opcode = OP_CREATE_CONTEXT;
+    instr.C.imm = 0;
+    instr.C.dest = 0; 
+    add_instr(instr, func_name_with_line_break, meta);
     
     
     
@@ -635,7 +657,7 @@ void gen_func(Node* node, Metadata* meta)
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = (u64)-1;
         instr.C.dest = R_FIRST_LOCAL;
-        add_instr(instr, node->line_text, meta);
+        add_instr(instr, func_name_with_line_break, meta);
     }
     else
     {
@@ -643,9 +665,9 @@ void gen_func(Node* node, Metadata* meta)
         instr.I.imm = 0;
         instr.I.op = R_RETURN_ADDR;
         instr.I.dest = R_FIRST_LOCAL;
-        add_instr(instr, node->line_text, meta);
+        add_instr(instr, func_name_with_line_break, meta);
     }
-
+    
     
     
     for(msi i = 0; i < ARR_LEN(meta->cur_func->arguments); ++i)
@@ -660,7 +682,7 @@ void gen_func(Node* node, Metadata* meta)
                 instr.I.imm = 0;
                 instr.I.op = R_FIRST_ARG + i;
                 instr.I.dest = get_reg(meta, var);
-                add_instr(instr, node->line_text, meta);
+                add_instr(instr, func_name_with_line_break, meta);
                 break;   
             }
             default:
@@ -669,7 +691,7 @@ void gen_func(Node* node, Metadata* meta)
                 instr.I.imm = 0;
                 instr.I.op = R_FIRST_ARG + i;
                 instr.I.dest = get_reg(meta, var);
-                add_instr(instr, node->line_text, meta);
+                add_instr(instr, func_name_with_line_break, meta);
                 break;
             }
         }
@@ -960,24 +982,11 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     
     //AFTER CALL
     
-    instr.C.opcode = OP_WRITE_CONSTANT;
-    if(meta->cur_func == nullptr)
-    {
-        instr.C.imm = 1;
-    }
-    else
-    {   
-        instr.C.imm = meta->cur_func->context_num;
-    }
-    instr.C.dest = R_CONTEXT;
-    add_instr(instr, node->line_text, meta);
-    
-    
     result.value = get_reg(meta);
-    instr.I.opcode = OP_IADD;
-    instr.I.dest = result.value;
-    instr.I.op = R_RETURN;
-    instr.I.imm = 0;
+    instr.R.opcode = OP_ADD;
+    instr.R.dest = result.value;
+    instr.R.op1 = R_RETURN;
+    instr.R.op2 = R_ZERO;
     add_instr(instr, node->line_text, meta);
     
     result.tmp = true;
@@ -1315,6 +1324,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
                 Instr instr={};
+                instr.I.opcode = OP_ICMP_EQ;
                 instr.I.imm = 0; //same as float 0
                 instr.I.dest = result.value;
                 instr.I.op = result.value;
@@ -1333,6 +1343,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
                 Instr instr={};
+                instr.I.opcode = OP_ICMP_EQ;
                 instr.I.dest = result.value;
                 instr.I.imm = 0;
                 instr.I.op = result.value;
@@ -1481,8 +1492,8 @@ gen_assign(Node* node, Metadata* meta)
     Instr instr = {};
     
     if((expr_result.constant &&
-           expr_result.dataType == S64 &&
-           s64_abs(expr_result.value) > 2147483647)
+        expr_result.dataType == S64 &&
+        s64_abs(expr_result.value) > 2147483647)
        || (expr_result.constant &&
            expr_result.dataType == F64 &&
            !f64_eq(expr_result.value, (f32)expr_result.value)))
@@ -1538,7 +1549,7 @@ gen_assign(Node* node, Metadata* meta)
         instr.I.imm = R_ZERO;
         
         add_instr(instr, node->line_text, meta);
-       
+        
     }
     else
     {
@@ -1965,8 +1976,8 @@ static
 Metadata generate(Node* ast, msi reg_max, Heap_Allocator* heap)
 {
     Metadata meta = {};
-    meta.context_cnt = 2;
     meta.cur_global_reg = 0;
+    meta.cur_init_reg = 0;
     meta.main_jmp = {};
     ARR_INIT(meta.init_instr_list, 32, heap);
     ARR_INIT(meta.instr_list, 128, heap);

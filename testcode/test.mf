@@ -1,22 +1,13 @@
-fn just_nothing(s64 a) : s64
+fn fib(s64 n) : s64
 {
-	return a;
+	if(n <= 1)
+	{
+		return n;
+	}
+	return fib(n - 1) + fib(n - 2);
 }
-
-fn real_add(s64 a, s64 b) : s64
-{
-	return just_nothing(b) + just_nothing(a);
-}
-
-fn add(s64 a, s64 b) : s64
-{
-	return real_add(a, b);
-}
-
-f64 gvar = just_nothing(5);
-c8 gvar2 = add(real_add(4, 2), gvar);
 
 fn main(s64 argc, s64* argv) : s64
 {
-    return gvar2;
+    return fib(22);
 }

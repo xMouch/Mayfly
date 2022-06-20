@@ -32,6 +32,8 @@ struct Machine
         s64** r;
         f64** fR;
     };
+    
+    u64* context_free_list;
 };
 
 s64*
@@ -67,17 +69,36 @@ R(Machine m, u32 reg)
     }
 }
 
-f64*
-RF(Machine m, u32 reg)
+f64* RF(Machine m, u32 reg)
 { 
     return (f64*)(void*)R(m, reg);
 }
 
+void free_context(u64 context, Machine* m)
+{
+    ARR_PUSH(m->context_free_list, context);
+    ARR_DEL_ALL(m->r[context]);
+}
+
+u64 get_next_free_context(Machine* m)
+{
+    u64 result = 0;
+    if(ARR_LEN(m->context_free_list) == 0)
+    {
+        result = ARR_LEN(m->r);
+    }
+    else
+    {
+        result = ARR_POP(m->context_free_list);
+    }
+    return result;
+}
+
 int main(s32 argc, c8** argv)
 {
-    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(512), (u8*)malloc(IR_MEGABYTES(512)));
+    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(1024), (u8*)malloc(IR_MEGABYTES(1024)));
     
-    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(128), 0);
+    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(512), 0);
     
     Instr* instr_list;
     
@@ -94,8 +115,11 @@ int main(s32 argc, c8** argv)
     
     Machine m = {};
     ARR_INIT(m.r, 16, &heap);
+    ARR_INIT(m.context_free_list, 16, &heap);
+    ARR_PUSH(m.r, nullptr);
     ARR_PUSH(m.r, nullptr);
     ARR_INIT(m.r[0], 16, arr_header(m.r)->heap);
+    ARR_INIT(m.r[1], 16, arr_header(m.r)->heap);
     *R(m, R_ZERO) = 0;
     *R(m, R_PROG_CNT) = 0;
     *R(m, R_RETURN) = 0;
@@ -464,11 +488,26 @@ int main(s32 argc, c8** argv)
                     printf("Program float END: %f\n", (*RF(m, R_RETURN)));
                     return (*R(m, R_RETURN));
                 }
+                else if(i.J.jmp == R_FIRST_LOCAL)
+                {
+                    u64 cur_context = *R(m, R_CONTEXT);
+                    u64 prev_context = *R(m, R_FIRST_LOCAL + 1);
+                    *R(m, R_CONTEXT) = prev_context;
+                    free_context(cur_context, &m);
+                }
                 break;
             }
             case OP_WRITE_CONSTANT:
             {
                 *R(m, i.C.dest) = i.C.imm;
+                break;   
+            }
+            case OP_CREATE_CONTEXT:
+            {
+                u64 context = get_next_free_context(&m);
+                u64 prev_context = *R(m, R_CONTEXT);
+                *R(m, R_CONTEXT) = context;
+                *R(m, R_FIRST_LOCAL + 1) = prev_context;
                 break;   
             }
             default:

@@ -68,7 +68,7 @@ struct Function{
     Variable** arguments;
     
     msi jmp_loc;
-    msi context_num;
+   // msi context_num;
 };
 
 struct Node{
