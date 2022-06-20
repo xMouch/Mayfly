@@ -52,9 +52,13 @@ enum DataType{
     C8, S64, F64
 };
 
-struct Variable{
+struct Type{
     DataType dataType;
     msi pointerLvl; //0 -> not a pointer
+};
+
+struct Variable{
+    Type type;
     String name;
     msi id;
     msi level;
@@ -63,7 +67,7 @@ struct Variable{
 };
 
 struct Function{
-    Token_Type returnType;
+    Type returnType;
     String name;
     Variable** arguments;
     
@@ -82,7 +86,7 @@ struct Node{
         Variable* var;
         Function* func;
     };
-    DataType dataType;
+    Type dataType;
     Node* left;
     Node* right;
 };

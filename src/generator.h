@@ -674,7 +674,7 @@ void gen_func(Node* node, Metadata* meta)
     {
         Variable* var = meta->cur_func->arguments[i];
         
-        switch(var->dataType)
+        switch(var->type.dataType)
         {
             case C8:
             {
@@ -717,18 +717,18 @@ struct Expr_Result
         f64 fValue;
         c8 cValue;
     };
-    DataType dataType;
+    Type type;
     c8 constant;
     c8 tmp;
 };
 
-#define get_value(var) (((var.dataType)==F64)?var.fValue:((var.dataType)==S64)?var.value:var.cValue)
+#define get_value(var) (((var.type.dataType)==S64 || var.type.pointerLvl > 0) ? var.value : ((var.type.dataType)==F64) ? var.fValue : var.cValue)
 //no matter datatype everything is cast to f64 due to ternary op; is this an issue?
-#define get_int_value(var) (((var.dataType)==S64)?var.value:var.cValue)
+#define get_int_value(var) (((var.type.dataType)==S64 || var.type.pointerLvl > 0) ? var.value : var.cValue)
 
 static
 void assign_expr_value(Expr_Result &res, s64 value){
-    if (res.dataType == S64)
+    if (res.type.dataType == S64)
         res.value = value;
     else
         res.cValue = (c8)value;
@@ -736,9 +736,9 @@ void assign_expr_value(Expr_Result &res, s64 value){
 
 static
 void assign_expr_value(Expr_Result &res, f64 value){
-    if (res.dataType == F64)
+    if (res.type.dataType == F64)
         res.fValue = value;
-    else if (res.dataType == S64)
+    else if (res.type.dataType == S64)
         res.value = (s64)value;
     else
         res.cValue = (c8)value;
@@ -754,11 +754,11 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
     
     Instr instr={};
     
-    b8 floatOp = left.dataType == F64;
-    b8 isC8op = left.dataType == C8 && right.dataType == C8;
+    b8 floatOp = left.type.dataType == F64;
+    b8 isC8op = left.type.dataType == C8 && right.type.dataType == C8;
     
-    if((left.constant && left.dataType == S64 && s64_abs(left.value) > 2147483647)
-       || (left.constant && left.dataType == F64 && !f64_eq(left.value, (f32)left.value)))
+    if((left.constant && left.type.dataType == S64 && s64_abs(left.value) > 2147483647)
+    || (left.constant && left.type.dataType == F64 && !f64_eq(left.value, (f32)left.value)))
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = left.value;
@@ -771,8 +771,8 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
         add_instr(instr, cur_line, meta);
     }
     
-    if((right.constant && right.dataType == S64 && s64_abs(right.value) > 2147483647)
-       || (right.constant && right.dataType == F64 && !f64_eq(right.value, (f32)right.value)))
+    if((right.constant && right.type.dataType == S64 && s64_abs(right.value) > 2147483647)
+    || (right.constant && right.type.dataType == F64 && !f64_eq(right.value, (f32)right.value)))
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = right.value;
@@ -931,7 +931,7 @@ static
 Expr_Result gen_func_call(Node* node, Metadata* meta)
 {
     Function* func = node->func;
-    DataType ret_type = node->dataType;
+    Type ret_type = node->dataType;
     msi num_args = ARR_LEN(func->arguments);
     
     IR_ASSERT(num_args > 128 - R_FIRST_ARG && "Too many arguments!");
@@ -991,7 +991,7 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     
     result.tmp = true;
     result.constant = false;
-    result.dataType = ret_type;
+    result.type = ret_type;
     return result;
 }
 
@@ -1007,7 +1007,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
         res_right = gen_expr(node->right, meta);
     
     Expr_Result result = {};
-    result.dataType = node->dataType;
+    result.type = node->dataType;
     
     switch(node->type)
     {
@@ -1366,7 +1366,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 
                 Instr instr={};
                 
-                if (node->dataType == F64){
+                if (node->dataType.dataType == F64){
                     instr.I.opcode = OP_F_IMUL;
                     instr.I.fImm = -1;
                 }else{
@@ -1472,7 +1472,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             break;
         }
     }
-    result.dataType = node->dataType;
+    result.type = node->dataType;
     
     return result;
 }
@@ -1486,16 +1486,16 @@ gen_assign(Node* node, Metadata* meta)
     
     Expr_Result expr_result = gen_expr(node->right, meta);
     
-    b8 isFloat = expr_result.dataType == F64;
-    b8 isC8 = node->left->dataType == C8;
+    b8 isFloat = expr_result.type.dataType == F64;
+    b8 isC8 = node->left->dataType.dataType == C8;
     
     Instr instr = {};
     
     if((expr_result.constant &&
-        expr_result.dataType == S64 &&
+        expr_result.type.dataType == S64 &&
         s64_abs(expr_result.value) > 2147483647)
        || (expr_result.constant &&
-           expr_result.dataType == F64 &&
+           expr_result.type.dataType == F64 &&
            !f64_eq(expr_result.value, (f32)expr_result.value)))
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
@@ -1554,7 +1554,7 @@ gen_assign(Node* node, Metadata* meta)
     else
     {
         //if there is already a tmp register we can change the output to our dest
-        if(isC8 && expr_result.dataType != C8)
+        if(isC8 && expr_result.type.dataType != C8)
         {
             instr.I.opcode = OP_8_IADD;
             instr.I.dest = get_reg(meta, node->left->var);
@@ -1641,12 +1641,12 @@ void gen_return(Node* node, Metadata* meta)
     Instr instr = {};
     if(expr_res.constant)
     {
-        if (node->dataType==F64)
+        if (node->dataType.dataType==F64)
         {
             instr.I.opcode = OP_F_IADD;
             instr.I.fImm = expr_res.fValue;
         }
-        else if(node->dataType==C8)
+        else if(node->dataType.dataType==C8)
         {
             instr.I.opcode = OP_8_IADD;
             instr.I.imm = get_value(expr_res);
@@ -1662,7 +1662,7 @@ void gen_return(Node* node, Metadata* meta)
     }
     else
     {
-        if(node->dataType==C8)
+        if(node->dataType.dataType==C8)
         {
             instr.R.opcode = OP_8_ADD;
         }
