@@ -58,6 +58,8 @@ struct Variable{
     String name;
     msi id;
     msi level;
+    
+    msi global_loc; // is -1 when not global
 };
 
 struct Function{
@@ -66,6 +68,7 @@ struct Function{
     Variable* arguments;
     
     msi jmp_loc;
+    msi context_num;
 };
 
 struct Node{

@@ -43,6 +43,13 @@ s32_abs(s32 value)
     return result;
 }
 
+inline s64
+s64_abs(s64 value)
+{
+    s64 result = value * ((value <= 0) ? -1 : 1);
+    return result;
+}
+
 inline s32
 s32_sign(s32 value)
 {
@@ -146,6 +153,8 @@ SWAPFUNCTION(s64);
 #ifndef IR_FLOAT_MATHS
 #define IR_FLOAT_MATHS
 #define IR_PI 3.1415926535f
+#define IR_F32_EPS 0.00000006
+
 
 /**
  * @brief float operations
@@ -186,6 +195,20 @@ intr_sin(f32 x)
     
     return x;
 }
+
+inline f64
+f64_abs(f64 value)
+{
+    f64 result = value * ((value <= 0) ? -1 : 1);
+    return result;
+}
+
+inline b8
+f64_eq(f64 v1, f64 v2)
+{
+    return f64_abs(v1 - v2) < IR_F32_EPS;
+}
+
 
 inline f32
 f32_abs(f32 value)

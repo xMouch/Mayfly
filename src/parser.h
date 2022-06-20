@@ -13,6 +13,8 @@ Variable* p_variables;
 Variable* p_variablesInScope;
 msi p_currentScope;
 
+msi global_cnt = 0;
+
 Function* p_functions;
 
 Token getPreviousToken(msi howFarBack);
@@ -136,7 +138,7 @@ c8 expect(msi tokenType){
 
 //this method does identifier checking
 //TOKEN_UNKNOWN->not a declaration; TOKEN_S64, TOKEN_F64, TOKEN_B8
-msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
+msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal = false){
     if (!declarationType){
         for (s64 i=ARR_LEN(p_variablesInScope)-1;i>=0;i--){
             if (cmp_string(t.text,p_variablesInScope[i].name)){
@@ -163,6 +165,14 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
         v.id = ARR_LEN(p_variables);
         v.name = t.text;
         v.pointerLvl = pointerLvl;
+        if(isGlobal)
+        {
+            v.global_loc = global_cnt++;
+        }
+        else
+        {
+            v.global_loc = (msi)-1;
+        }
         ARR_PUSH(p_variables,v);
         ARR_PUSH(p_variablesInScope,v);
         return v.id;
@@ -170,18 +180,18 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t){
 }
 
 
-c8 acceptId(Token_Type declarationType, msi pointerLvl){
+c8 acceptId(Token_Type declarationType, msi pointerLvl, b8 isGlobal = false){
     if (accept(TOKEN_ID)){
-        inspectId(declarationType, pointerLvl, getPreviousToken(1));
+        inspectId(declarationType, pointerLvl, getPreviousToken(1), isGlobal);
         return true;
     }
     return false;
 }
 
-msi expectId(Token_Type declarationType, msi pointerLvl){
+msi expectId(Token_Type declarationType, msi pointerLvl, b8 isGlobal = false){
     Token t = *p_currentToken;
     if (accept(TOKEN_ID))
-        return inspectId(declarationType, pointerLvl, t);
+        return inspectId(declarationType, pointerLvl, t, isGlobal);
     printf("Error, expected: %u at %llu:%llu\n", declarationType,
            t.line,
            p_parsing ? t.column : t.column + t.text.length);
@@ -676,7 +686,7 @@ Node* block(){
         msi pointerLvl = 0;
         while (accept('*'))
             pointerLvl++;
-        msi index = expectId(t, pointerLvl);
+        msi index = expectId(t, pointerLvl, true);
         if (accept('=')){
             Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].dataType});
             Node* right = expression();

@@ -1,26 +1,34 @@
 before call:
 
- 
-push	R_FRAME_PTR 
-push	R_RETURN_ADDR
-set 	R_FRAME_PTR to R_STACK_PTR
-push    ARGS
-set     R_RETURN_ADDR to R_PROG_CNT + 1;
+set R_RETURN_ADDR to R_PROG_CNT +1
+set all ARGS
 jmp
 
-	
+on func enter
+set R_CONTEXT
+copy R_RETURN_ADDR to CONTEXT_R_RETURN_ADDR
+copy all ARGS to context
 
-on return:
+on return
 
 set R_RETURN to return value
-set R_STACK_PTR to R_FRAME_PTR:
-jmp to R_RETURN_ADDR
+jmp to CONTEXT_R_RETURN_ADDR
 
 
 after call:
-pop R_RETURN_ADDR to R_RETURN_ADDR
-pop R_FRAME_PTR to R_FRAME_PTR
+set R_CONTEXT
 
+
+
+REGISTER ALLOCATION:
+
+0..4 shared R_ZERO to R_RETURN_ADDR
+5(R_FIRST_ARG)..128 shared args
+129..2^30 shared global vars
+
+2^30+1..2^32 local context
+
+2^30+1 == R_FIRST_LOCAL == CONTEXT_R_RETURN_ADDR
 
 
 

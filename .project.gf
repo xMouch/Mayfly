@@ -1,4 +1,4 @@
 [executable]
-path=./mayflyc
-arguments=
+path=./mayfly
+arguments=binary.mayfly
 ask_directory=1

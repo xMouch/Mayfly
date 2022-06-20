@@ -43,6 +43,7 @@ int main(s32 argc, c8** argv)
     
     Token* tokens = tokenize(file, &heap);
     
+    
     /*
     for(msi i = 0; i < ARR_LEN(tokens); ++i)
     {
