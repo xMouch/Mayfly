@@ -60,19 +60,20 @@ Node* derefChain(Node* child, msi count){
         return child;
 }
 
-void inCompatibleDataError(Type left, Type right){
+void inCompatibleDataError(Type left, Type right, String lineText){
     printf("Error incompatible types: %.*s%.*s and %.*s%.*s\n",
            left.pointerLvl, "***********", data_type_to_str(left.dataType),
            right.pointerLvl, "***********", data_type_to_str(right.dataType));
+    printf(" %.*s",lineText);
     exit(1);
 }
 
 Type convertNodes(Node** left, Node** right, bool assignment = false){
     if((*left)->dataType.pointerLvl != (*right)->dataType.pointerLvl)
-        inCompatibleDataError((*left)->dataType, (*right)->dataType);
+        inCompatibleDataError((*left)->dataType, (*right)->dataType,(*left)->line_text);
     if((*left)->dataType.dataType != (*right)->dataType.dataType){
         if((*left)->dataType.pointerLvl != 0)
-            inCompatibleDataError((*left)->dataType, (*right)->dataType);
+            return (*left)->dataType;
         DataType resDataType = assignment?(*left)->dataType.dataType:(DataType)s64_max((*left)->dataType.dataType, (*right)->dataType.dataType);
         if((*left)->dataType.dataType == F64 || (*right)->dataType.dataType == F64){
             if ((*left)->dataType.dataType != resDataType){
@@ -89,11 +90,11 @@ Type convertNodes(Node** left, Node** right, bool assignment = false){
 
 Type convertNode(Type left, Node** right){
     if(left.pointerLvl != (*right)->dataType.pointerLvl)
-        inCompatibleDataError(left, (*right)->dataType);
+        inCompatibleDataError(left, (*right)->dataType,(*right)->line_text);
     else if(left.dataType != (*right)->dataType.dataType)
     {
         if (left.pointerLvl != 0)
-            inCompatibleDataError(left, (*right)->dataType);
+            return left;
         if (left.dataType == F64 || (*right)->dataType.dataType == F64){
             *right = makeNode({.type=dataTypeToConversionOp(left.dataType),.dataType=left,.left=*right});
         }
@@ -236,8 +237,8 @@ Token_Type acceptType(){
 }
 
 void operandError(Token_Type operation, Node node){
-    printf("error: invalid operands for operation %.*s\n", type_to_str(operation));
-    printf("%.*s\n", node.line_text);
+    printf("error: invalid operand(s) for operation %.*s\n", type_to_str(operation));
+    printf(" %.*s", node.line_text);
     exit(1);
 }
 
@@ -561,6 +562,8 @@ Node* term(){
 Node* exp2(){ //TODO: operanderror for pointer types on most operations
     if (accept('-')){
         Node* n = term();
+        if(n->dataType.pointerLvl>0)
+            operandError((Token_Type)'-', *n);
         return makeNode({.type=N_NEG,.dataType=n->dataType,.left=n});
     } else if (accept('*')){
         Node* n = term();
@@ -568,7 +571,10 @@ Node* exp2(){ //TODO: operanderror for pointer types on most operations
             operandError((Token_Type)'*',*n);
         return makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n});
     } else if (accept('!')){
-        return makeNode({.type=N_NOT,.dataType={.dataType=S64, .pointerLvl=0},.left=term()});
+        Node* n = term();
+        if(n->dataType.pointerLvl>0)
+            operandError((Token_Type)'-', *n);
+        return makeNode({.type=N_NOT,.dataType={.dataType=S64, .pointerLvl=0},.left=n});
     } else {
         accept('+');
         return term();
@@ -737,7 +743,7 @@ Node* program(){
     return nullptr;
 }
 void printVar(Variable v){
-    printf("%.*s ", type_to_str(v.type.dataType));
+    printf("%.*s ", data_type_to_str(v.type.dataType));
     printf("%.*s", v.type.pointerLvl, "****************");
     printf("%.*s ", v.name);
 }
@@ -782,6 +788,7 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     Function reallocF = {};
     reallocF.name = IR_CONSTZ("realloc");
     reallocF.returnType = {.dataType=S64, .pointerLvl=1};
+    reallocF.jmp_loc = (s64)-1;
     ARR_INIT(reallocF.arguments,4, heap);
     Variable v = {};
     v.type = {.dataType=S64, .pointerLvl=1};
