@@ -53,14 +53,13 @@ Node* makeNode(Node newNode, s64 textOffset = 0){
     return ARR_LAST(p_nodes);
 }
 
-Node* derefChain(Node* child, msi count){
-    if(count > 0)
-        return makeNode({.type=N_DEREF, .left=derefChain(child, count-1)});
-    else
-        return child;
+void operandError(Token_Type operation, Node node){
+    printf("error: invalid operand(s) for operation %.*s\n", type_to_str(operation));
+    printf(" %.*s", node.line_text);
+    exit(1);
 }
 
-void inCompatibleDataError(Type left, Type right, String lineText){
+void incompatibleDataError(Type left, Type right, String lineText){
     printf("Error incompatible types: %.*s%.*s and %.*s%.*s\n",
            left.pointerLvl, "***********", data_type_to_str(left.dataType),
            right.pointerLvl, "***********", data_type_to_str(right.dataType));
@@ -68,10 +67,21 @@ void inCompatibleDataError(Type left, Type right, String lineText){
     exit(1);
 }
 
+Node* derefChain(Node* child, msi count){
+    if(count > 0){
+        Node* children = derefChain(child, count-1);
+        Type type = {.dataType=children->dataType.dataType, .pointerLvl=children->dataType.pointerLvl-1};
+        if (((s64)children->dataType.pointerLvl)-1<0)
+            operandError((Token_Type)'*', *child);
+        return makeNode({.type=N_DEREF, .dataType=type, .left=children});
+    }else
+        return child;
+}
+
 Type convertNodes(Node** left, Node** right, bool assignment = false){
     if((assignment && (*right)->dataType.pointerLvl != 0 && (*left)->dataType.pointerLvl == 0 && (*left)->dataType.dataType != S64) ||
         (!assignment && ((*right)->dataType.pointerLvl == 0 ^ (*left)->dataType.pointerLvl == 0)))
-        inCompatibleDataError((*left)->dataType, (*right)->dataType, (*left)->line_text);
+        incompatibleDataError((*left)->dataType, (*right)->dataType, (*left)->line_text);
     if((*left)->dataType.dataType != (*right)->dataType.dataType){
         if((*left)->dataType.pointerLvl != 0)
             return (*left)->dataType;
@@ -91,7 +101,7 @@ Type convertNodes(Node** left, Node** right, bool assignment = false){
 
 Type convertNode(Type left, Node** right){
     if(left.pointerLvl == 0 ^ (*right)->dataType.pointerLvl == 0)
-        inCompatibleDataError(left, (*right)->dataType,(*right)->line_text);
+        incompatibleDataError(left, (*right)->dataType, (*right)->line_text);
     else if(left.dataType != (*right)->dataType.dataType)
     {
         if (left.pointerLvl != 0)
@@ -237,12 +247,6 @@ Token_Type acceptType(){
     return TOKEN_UNKOWN;
 }
 
-void operandError(Token_Type operation, Node node){
-    printf("error: invalid operand(s) for operation %.*s\n", type_to_str(operation));
-    printf(" %.*s", node.line_text);
-    exit(1);
-}
-
 Node* expression();
 Node* statements();
 
@@ -273,6 +277,8 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
                 n = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
                 Token* curTok = p_currentToken;
                 while (accept('[')){
+                    if (n->dataType.pointerLvl <= 0)
+                        operandError((Token_Type)'[', *n);
                     Node* right = expression();
                     expect(']');
                     n = makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n,.right=right});
@@ -569,6 +575,8 @@ Node* term(){
 Node* exp1(){
     Node* n = term();
     while (accept('[')){
+        if (n->dataType.pointerLvl <= 0)
+            operandError((Token_Type)'[', *n);
         Node* right = expression();
         expect(']');
         n = makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n,.right=right});
