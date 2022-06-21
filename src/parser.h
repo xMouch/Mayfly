@@ -812,7 +812,7 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     p_tokens = tokens;
     p_currentIndex = -1;
     p_parsing = true;
-    ARR_INIT(p_nodes,64, heap);
+    ARR_INIT(p_nodes,226, heap);
     ARR_INIT(p_variables,64, heap);
     ARR_INIT(p_variablesInScope,64, heap);
     ARR_INIT(p_functions,8, heap);
@@ -860,12 +860,7 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     
     Parser_Result result;
     result.ast = ast;
-    result.reg_max = ARR_LEN(p_variables)+10;
-    
-    for(msi i = 0; i < ARR_LEN(p_variables); ++i)
-    {
-        p_variables[i].id +=10; 
-    }
+    result.reg_max = ARR_LEN(p_variables);
     
     return result;
 }

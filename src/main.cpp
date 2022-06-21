@@ -30,7 +30,7 @@ String read_entire_file(c8* file_name, Memory_Arena* arena)
 
 int main(s32 argc, c8** argv)
 {
-    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(512), (u8*)malloc(IR_MEGABYTES(512)));
+    Memory_Arena arena = create_memory_arena(IR_MEGABYTES(1024), (u8*)malloc(IR_MEGABYTES(1024)));
     
     String file;
     
@@ -39,7 +39,7 @@ int main(s32 argc, c8** argv)
     }else
         file = read_entire_file("testcode/test.mf", &arena);
     
-    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(256), 0);
+    Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(512), 10);
     
     Token* tokens = tokenize(file, &heap);
     
