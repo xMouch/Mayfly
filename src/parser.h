@@ -272,10 +272,11 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
                 if(accept('=')){
                     Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
                     Node* right = expression();
+                    left = derefChain(left,pointerLvl);
                     Type dataType = convertNodes(&left, &right, true);
                     if (left->dataType.dataType == F64 && pointerLvl>0)
                         operandError((Token_Type)'*',*left);
-                    n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=derefChain(left,pointerLvl),.right=right});
+                    n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=left,.right=right});
                 }else{
                     previousToken();
                     n = expression();
@@ -403,7 +404,7 @@ Node* function(c8 declaration){
 
 Node* statement(){
     Token_Type type;
-    Node* n = nullptr;
+    Node* n;
     if (accept('{')){
         increaseScope();
         n = statements();
@@ -785,21 +786,41 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     ARR_INIT(p_variablesInScope,64, heap);
     ARR_INIT(p_functions,8, heap);
 
-    Function reallocF = {};
-    reallocF.name = IR_CONSTZ("realloc");
-    reallocF.returnType = {.dataType=S64, .pointerLvl=1};
-    reallocF.jmp_loc = (s64)-1;
-    ARR_INIT(reallocF.arguments,4, heap);
+    Function builtIn = {};
+    builtIn.name = IR_CONSTZ("realloc");
+    builtIn.returnType = {.dataType=S64, .pointerLvl=1};
+    builtIn.jmp_loc = (s64)-1;
+    ARR_INIT(builtIn.arguments, 2, heap);
     Variable v = {};
     v.type = {.dataType=S64, .pointerLvl=1};
     v.name = IR_CONSTZ("ptr");
     v.global_loc = -1;
-    ARR_PUSH(reallocF.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("new_size");
     v.global_loc = -1;
-    ARR_PUSH(reallocF.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, reallocF);
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(p_functions, builtIn);
+
+    builtIn.name = IR_CONSTZ("printS64");
+    builtIn.returnType = {.dataType=S64, .pointerLvl=0};
+    builtIn.jmp_loc = (s64)-2;
+    ARR_INIT(builtIn.arguments, 1, heap);
+    v.type = {.dataType=S64, .pointerLvl=0};
+    v.name = IR_CONSTZ("value");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(p_functions, builtIn);
+
+    builtIn.name = IR_CONSTZ("printF64");
+    builtIn.returnType = {.dataType=S64, .pointerLvl=0};
+    builtIn.jmp_loc = (s64)-3;
+    ARR_INIT(builtIn.arguments, 1, heap);
+    v.type = {.dataType=F64, .pointerLvl=0};
+    v.name = IR_CONSTZ("value");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(p_functions, builtIn);
 
     p_heap = heap;
     nextToken();

@@ -1485,16 +1485,16 @@ static
 void 
 gen_assign(Node* node, Metadata* meta)
 {
-    IR_ASSERT(node->left->type == N_VAR);// || node->left->type == N_DEREF);
+    IR_ASSERT(node->left->type == N_VAR || node->left->type == N_DEREF);
     IR_ASSERT(node->right->type == N_EXPR);
     
     Expr_Result expr_result = gen_expr(node->right, meta);
     
-    b8 isFloat = expr_result.type.dataType == F64 && expr_result.type.pointerLvl == 0;
+    b8 isFloat = node->left->dataType.dataType == F64 && expr_result.type.pointerLvl == 0;
     b8 isC8 = node->left->dataType.dataType == C8 && expr_result.type.pointerLvl == 0;
     
     Instr instr = {};
-    
+
     if((expr_result.constant &&
         expr_result.type.dataType == S64 &&
         s64_abs(expr_result.value) > 2147483647)
@@ -1504,7 +1504,7 @@ gen_assign(Node* node, Metadata* meta)
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = expr_result.value;
-        instr.C.dest = get_reg(meta, node->left->var);
+        instr.C.dest = get_reg(meta);
         
         expr_result.constant = false;
         expr_result.tmp = true;
@@ -1512,65 +1512,118 @@ gen_assign(Node* node, Metadata* meta)
         
         add_instr(instr, node->line_text, meta);
     }
-    
-    if(expr_result.constant)
-    {
-        if (isFloat)
+
+    if (node->left->type != N_DEREF){
+        if(expr_result.constant)
         {
-            instr.I.opcode = OP_F_IADD;
-            instr.I.fImm = expr_result.fValue;
-        }
-        else if(isC8)
-        {
-            instr.I.opcode = OP_8_IADD;
-            instr.I.imm = expr_result.value;   
-        }
-        else
-        {
-            instr.I.opcode = OP_IADD;
-            instr.I.imm = expr_result.value;
-        }
-        instr.I.dest = get_reg(meta, node->left->var);
-        instr.I.op = R_ZERO;
+            if (isFloat)
+            {
+                instr.I.opcode = OP_F_IADD;
+                instr.I.fImm = expr_result.fValue;
+            }
+            else if(isC8)
+            {
+                instr.I.opcode = OP_8_IADD;
+                instr.I.imm = expr_result.value;
+            }
+            else
+            {
+                instr.I.opcode = OP_IADD;
+                instr.I.imm = expr_result.value;
+            }
+            instr.I.dest = get_reg(meta, node->left->var);
+            instr.I.op = R_ZERO;
         
-        add_instr(instr, node->line_text, meta);
-    }
-    else if(!expr_result.tmp){
-        if (isFloat)
-        {
-            instr.I.opcode = OP_F_IADD;
+            add_instr(instr, node->line_text, meta);
         }
-        else if(isC8)
-        {
-            instr.I.opcode = OP_8_IADD; 
-        }
-        else
-        {
-            instr.I.opcode = OP_IADD;
-        }
-        instr.I.dest = get_reg(meta, node->left->var);
-        instr.I.op = expr_result.value;
-        instr.I.imm = R_ZERO;
-        
-        add_instr(instr, node->line_text, meta);
-        
-    }
-    else
-    {
-        //if there is already a tmp register we can change the output to our dest
-        if(isC8 && expr_result.type.dataType != C8)
-        {
-            instr.I.opcode = OP_8_IADD;
+        else if(!expr_result.tmp){
+            if (isFloat)
+            {
+                instr.I.opcode = OP_F_IADD;
+            }
+            else if(isC8)
+            {
+                instr.I.opcode = OP_8_IADD;
+            }
+            else
+            {
+                instr.I.opcode = OP_IADD;
+            }
             instr.I.dest = get_reg(meta, node->left->var);
             instr.I.op = expr_result.value;
             instr.I.imm = R_ZERO;
-            
+        
             add_instr(instr, node->line_text, meta);
+        
         }
         else
         {
-            meta->last_gen_instr->R.dest = get_reg(meta, node->left->var);
+            //if there is already a tmp register we can change the output to our dest
+            if(isC8 && expr_result.type.dataType != C8)
+            {
+                instr.I.opcode = OP_8_IADD;
+                instr.I.dest = get_reg(meta, node->left->var);
+                instr.I.op = expr_result.value;
+                instr.I.imm = R_ZERO;
+            
+                add_instr(instr, node->line_text, meta);
+            }
+            else
+            {
+                meta->last_gen_instr->R.dest = get_reg(meta, node->left->var);
+            }
         }
+    }
+    else
+    {
+        //N_DEREF
+        Node* leftNode= node->left;
+        u32 opReg = expr_result.value;
+        if(expr_result.constant)
+        {
+            if (isFloat)
+            {
+                instr.I.opcode = OP_F_IADD;
+                instr.I.fImm = expr_result.fValue;
+            }
+            else if(isC8)
+            {
+                instr.I.opcode = OP_8_IADD;
+                instr.I.imm = expr_result.value;
+            }
+            else
+            {
+                instr.I.opcode = OP_IADD;
+                instr.I.imm = expr_result.value;
+            }
+            instr.I.dest = opReg = get_reg(meta);
+            instr.I.op = R_ZERO;
+
+            add_instr(instr, node->line_text, meta);
+        }
+        msi derefCnt=1;
+        while(leftNode->left->type == N_DEREF){
+            derefCnt++;
+            leftNode=leftNode->left;
+        }
+        u32 tmpReg = 0;
+        for(msi i = 0; i < derefCnt-1; i++){
+            Instr loadInstr = {};
+            loadInstr.I.opcode = OP_LOAD64;
+            loadInstr.I.op = (tmpReg!=0) ? tmpReg : get_reg(meta, leftNode->var);
+            if (tmpReg == 0)
+                tmpReg = get_reg(meta);
+            loadInstr.I.dest = tmpReg;
+            loadInstr.I.imm = 0; //todo: [] arithmetic
+            add_instr(loadInstr, node->line_text, meta);
+        }
+
+        Instr storeInstr = {};
+        storeInstr.I.opcode = (leftNode->left->dataType.dataType==C8) ? OP_STORE8 : OP_STORE64;
+        storeInstr.I.op = opReg;
+        storeInstr.I.dest = (tmpReg != 0) ? tmpReg : get_reg(meta, leftNode->left->var);
+        storeInstr.I.imm = 0; //todo: [] arithmetic
+        add_instr(storeInstr, node->line_text, meta);
     }
 }
 

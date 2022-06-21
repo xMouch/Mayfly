@@ -478,6 +478,7 @@ int main(s32 argc, c8** argv)
                 {
                     //REALLOC
                     *R(m, R_RETURN) = (s64)(void*)realloc((void*)(*R(m, R_FIRST_ARG)), *R(m, R_FIRST_ARG+1));
+                    zero_buffer(IR_WRAP_INTO_BUFFER(*R(m, R_RETURN),*R(m, R_FIRST_ARG + 1)));
                     *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
                     after_abs_jmp = true;
                 }
@@ -495,6 +496,7 @@ int main(s32 argc, c8** argv)
                 if(i.J.jmp == R_FIRST_LOCAL && *R(m, R_FIRST_LOCAL) == (u64)-1)
                 {
                     printf("Program int END: %lli\n", (s64)(*R(m, R_RETURN)) );
+                    printf("Program c8 END: %lli\n", (s64)(s8)(*R(m, R_RETURN)) );
                     printf("Program float END: %f\n", (*RF(m, R_RETURN)));
                     return (*R(m, R_RETURN));
                 }
