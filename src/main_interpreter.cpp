@@ -474,8 +474,18 @@ int main(s32 argc, c8** argv)
             }
             case OP_JMP:  
             {
-                *R(m, R_PROG_CNT) = i.J.jmp;
-                after_abs_jmp = true;
+                if(i.J.jmp == (u64) -1)
+                {
+                    //REALLOC
+                    *R(m, R_RETURN) = (s64)(void*)realloc((void*)(*R(m, R_FIRST_ARG)), *R(m, R_FIRST_ARG+1));
+                    *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
+                    after_abs_jmp = true;
+                }
+                else
+                {
+                    *R(m, R_PROG_CNT) = i.J.jmp;
+                    after_abs_jmp = true;
+                }
                 break;
             }
             case OP_JMPR:  

@@ -461,11 +461,11 @@ void print_instr(Instr instr, msi line_num, FILE* dst)
         }
     }else if(instr.R.opcode == OP_WRITE_CONSTANT)
     {
-        fprintf(dst, "%llu:  %.*s %s #(%llu/%f)\n", 
+        fprintf(dst, "%llu:  %.*s %s #(%lli/%f)\n", 
                 line_num,
                 opcode_to_str((Opcode)instr.C.opcode),
                 print_fix_local(instr.C.dest,&arena).data,
-                (u64)instr.C.imm,
+                (s64)instr.C.imm,
                 (f64)instr.C.fImm);
     }
     // J TYPE
@@ -480,10 +480,10 @@ void print_instr(Instr instr, msi line_num, FILE* dst)
         }
         else
         {
-            fprintf(dst, "%llu:  %.*s #%llu\n", 
+            fprintf(dst, "%llu:  %.*s #%lli\n", 
                     line_num,
                     opcode_to_str((Opcode)instr.J.opcode),
-                    (u64)instr.J.jmp); 
+                    (s64)instr.J.jmp); 
         }
         
     }  
@@ -678,12 +678,16 @@ void gen_func(Node* node, Metadata* meta)
         {
             case C8:
             {
-                instr.I.opcode = OP_8_IADD;
-                instr.I.imm = 0;
-                instr.I.op = R_FIRST_ARG + i;
-                instr.I.dest = get_reg(meta, var);
-                add_instr(instr, func_name_with_line_break, meta);
-                break;   
+                if(var->type.pointerLvl == 0)
+                {
+                    instr.I.opcode = OP_8_IADD;
+                    instr.I.imm = 0;
+                    instr.I.op = R_FIRST_ARG + i;
+                    instr.I.dest = get_reg(meta, var);
+                    add_instr(instr, func_name_with_line_break, meta);
+                    break; 
+                }
+                //NOTE(Michael)FALLTHROUGH!
             }
             default:
             {
@@ -1486,8 +1490,8 @@ gen_assign(Node* node, Metadata* meta)
     
     Expr_Result expr_result = gen_expr(node->right, meta);
     
-    b8 isFloat = expr_result.type.dataType == F64;
-    b8 isC8 = node->left->dataType.dataType == C8;
+    b8 isFloat = expr_result.type.dataType == F64 && expr_result.type.pointerLvl == 0;
+    b8 isC8 = node->left->dataType.dataType == C8 && expr_result.type.pointerLvl == 0;
     
     Instr instr = {};
     

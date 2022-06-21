@@ -1,13 +1,6 @@
-fn fib(s64 n) : s64
-{
-	if(n <= 1)
-	{
-		return n;
-	}
-	return fib(n - 1) + fib(n - 2);
-}
-
 fn main(s64 argc, s64* argv) : s64
 {
-    return fib(22);
+	c8* buf;
+	buf = realloc(buf, 16);
+    return buf[0];
 }
