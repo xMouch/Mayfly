@@ -1423,11 +1423,11 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     if (index_expr.constant){
                         instr.I.opcode = 
                                 (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
-                        instr.I.imm = get_value(index_expr);
+                        instr.I.imm = get_int_value(index_expr);
                     } else {
                         instr.R.opcode = 
                                 (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_LOAD8 : OP_LOAD64;
-                        instr.R.op2 = get_value(index_expr);
+                        instr.R.op2 = index_expr.value;
                     }
                 }
                 else{
@@ -1515,10 +1515,10 @@ gen_deref(Node* node, Metadata* meta, b8 firstExec, s64 opReg){
             Expr_Result index_expr = gen_expr(node->right, meta);
             if (index_expr.constant){
                 loadInstr.I.opcode = OP_ILOAD64;
-                loadInstr.I.imm = get_value(index_expr);
+                loadInstr.I.imm = get_int_value(index_expr);
             } else {
                 loadInstr.R.opcode = OP_LOAD64;
-                loadInstr.R.op2 = get_value(index_expr);
+                loadInstr.R.op2 = index_expr.value;
             }
         }
         else{
@@ -1541,11 +1541,11 @@ gen_deref(Node* node, Metadata* meta, b8 firstExec, s64 opReg){
                 storeInstr.I.opcode = 
                     (node->left->dataType.dataType==C8 &&
                      node->left->dataType.pointerLvl == 1) ? OP_ISTORE8 : OP_ISTORE64;
-                storeInstr.I.imm = get_value(index_expr);
+                storeInstr.I.imm = get_int_value(index_expr);
             } else {
                 storeInstr.R.opcode = (node->left->dataType.dataType==C8 &&
                                        node->left->dataType.pointerLvl == 1) ? OP_STORE8 : OP_STORE64;
-                storeInstr.R.op2 = get_value(index_expr);
+                storeInstr.R.op2 = index_expr.value;
             }
         }
         else{

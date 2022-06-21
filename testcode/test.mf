@@ -1,10 +1,51 @@
+fn massive_add(c8* arr, s64 count) : s64
+{
+	s64 result = 0;
+	for(c8 i = 0; i < count; i = i+1)
+	{
+		result = result + arr[i]; 
+	}
+
+	return result;
+}
+
+fn add_ALL_THE_THINGS(c8** arrays, s64 count1, s64 count2) : s64
+{
+	s64 result = 0;
+
+	for(s64 i = 0; i < count1; i = i+1)
+	{
+		result = result + massive_add(arrays[i], count2);
+	}
+
+	return result;
+}
+
+
+
+
 fn main() : s64
 {
-	c8* buf;
-	buf = realloc(buf, 8);
-	c8** bufbuf = realloc(bufbuf, 8);
-	buf[1] = 123;
-	bufbuf[0] = buf;
+	c8** arrays_of_doom = 0;
+	s64 dracula1 = 5;
+	s64 dracula2 = 10;
+
+	arrays_of_doom = realloc(arrays_of_doom, dracula1*8);
+
 	
-    return bufbuf[0][1];
+	for(s64 i = 0; i < dracula1; i = i +1)
+	{
+		arrays_of_doom[i] = realloc(arrays_of_doom[i], dracula2);
+
+		for(s64 j = 0; j < dracula2; j = j + 1)
+		{
+			arrays_of_doom[i][j] = 2;
+		}
+
+	}
+
+	
+
+    return massive_add(arrays_of_doom[0], dracula2);
+//add_ALL_THE_THINGS(arrays_of_doom, dracula1, dracula2);
 }
