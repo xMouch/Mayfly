@@ -1,6 +1,10 @@
-fn main(s64 argc, s64* argv) : s64
+fn main() : s64
 {
 	c8* buf;
-	buf = realloc(buf, 16);
-    return buf[0];
+	buf = realloc(buf, 8);
+	c8** bufbuf = realloc(bufbuf, 8);
+	buf[1] = 123;
+	bufbuf[0] = buf;
+	
+    return bufbuf[0][1];
 }

@@ -68,14 +68,14 @@ enum Opcode
     OP_F_DIV,
     OP_F_CMP_LT,
     OP_F_CMP_GT,
-
-
+    
+    
     //LOAD/STORE
     OP_LOAD64,
     OP_LOAD8,
     OP_STORE64,
     OP_STORE8,
-
+    
     //I_TYPES
     //INTEGER
     OP_IADD = 64,
@@ -773,7 +773,7 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
     b8 isC8op = left.type.dataType == C8 && right.type.dataType == C8;
     
     if((left.constant && left.type.dataType == S64 && s64_abs(left.value) > 2147483647)
-    || (left.constant && left.type.dataType == F64 && !f64_eq(left.value, (f32)left.value)))
+       || (left.constant && left.type.dataType == F64 && !f64_eq(left.value, (f32)left.value)))
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = left.value;
@@ -787,7 +787,7 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
     }
     
     if((right.constant && right.type.dataType == S64 && s64_abs(right.value) > 2147483647)
-    || (right.constant && right.type.dataType == F64 && !f64_eq(right.value, (f32)right.value)))
+       || (right.constant && right.type.dataType == F64 && !f64_eq(right.value, (f32)right.value)))
     {
         instr.C.opcode = OP_WRITE_CONSTANT;
         instr.C.imm = right.value;
@@ -1415,24 +1415,27 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             {
                 result.tmp = true;
                 result.constant = false;
-
+                
                 Instr instr = {};
                 if (node->right != nullptr)
                 {
                     Expr_Result index_expr = res_right;
                     if (index_expr.constant){
-                        instr.I.opcode = (res_left.type.dataType == C8) ? OP_ILOAD8 : OP_ILOAD64;
+                        instr.I.opcode = 
+                                (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
                         instr.I.imm = get_value(index_expr);
                     } else {
-                        instr.R.opcode = (res_left.type.dataType == C8) ? OP_LOAD8 : OP_LOAD64;
+                        instr.R.opcode = 
+                                (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_LOAD8 : OP_LOAD64;
                         instr.R.op2 = get_value(index_expr);
                     }
                 }
                 else{
-                    instr.I.opcode = (res_left.type.dataType == C8) ? OP_ILOAD8 : OP_ILOAD64;
+                    instr.I.opcode = 
+                               (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
                     instr.I.imm = 0;
                 }
-
+                
                 if(res_left.tmp)
                 {
                     instr.I.dest = res_left.value;
@@ -1442,7 +1445,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     instr.I.dest = get_reg(meta);
                     instr.I.op = res_left.value;
                 }
-
+                
                 result.value = instr.I.dest;
                 add_instr(instr, node->line_text, meta);
             }
@@ -1535,15 +1538,19 @@ gen_deref(Node* node, Metadata* meta, b8 firstExec, s64 opReg){
         {
             Expr_Result index_expr = gen_expr(node->right, meta);
             if (index_expr.constant){
-                storeInstr.I.opcode = (node->left->dataType.dataType==C8) ? OP_ISTORE8 : OP_ISTORE64;
+                storeInstr.I.opcode = 
+                    (node->left->dataType.dataType==C8 &&
+                     node->left->dataType.pointerLvl == 1) ? OP_ISTORE8 : OP_ISTORE64;
                 storeInstr.I.imm = get_value(index_expr);
             } else {
-                storeInstr.R.opcode = (node->left->dataType.dataType==C8) ? OP_STORE8 : OP_STORE64;
+                storeInstr.R.opcode = (node->left->dataType.dataType==C8 &&
+                                       node->left->dataType.pointerLvl == 1) ? OP_STORE8 : OP_STORE64;
                 storeInstr.R.op2 = get_value(index_expr);
             }
         }
         else{
-            storeInstr.I.opcode = (node->left->dataType.dataType==C8) ? OP_ISTORE8 : OP_ISTORE64;;
+            storeInstr.I.opcode = (node->left->dataType.dataType==C8 &&
+                                   node->left->dataType.pointerLvl == 1) ? OP_ISTORE8 : OP_ISTORE64;;
             storeInstr.I.imm = 0;
         }
         storeInstr.I.op = opReg;
@@ -1566,7 +1573,7 @@ gen_assign(Node* node, Metadata* meta)
     b8 isC8 = node->left->dataType.dataType == C8 && expr_result.type.pointerLvl == 0;
     
     Instr instr = {};
-
+    
     if((expr_result.constant &&
         expr_result.type.dataType == S64 &&
         s64_abs(expr_result.value) > 2147483647)
@@ -1584,7 +1591,7 @@ gen_assign(Node* node, Metadata* meta)
         
         add_instr(instr, node->line_text, meta);
     }
-
+    
     if (node->left->type != N_DEREF){
         if(expr_result.constant)
         {
@@ -1605,7 +1612,7 @@ gen_assign(Node* node, Metadata* meta)
             }
             instr.I.dest = get_reg(meta, node->left->var);
             instr.I.op = R_ZERO;
-        
+            
             add_instr(instr, node->line_text, meta);
         }
         else if(!expr_result.tmp){
@@ -1624,9 +1631,9 @@ gen_assign(Node* node, Metadata* meta)
             instr.I.dest = get_reg(meta, node->left->var);
             instr.I.op = expr_result.value;
             instr.I.imm = R_ZERO;
-        
+            
             add_instr(instr, node->line_text, meta);
-        
+            
         }
         else
         {
@@ -1637,7 +1644,7 @@ gen_assign(Node* node, Metadata* meta)
                 instr.I.dest = get_reg(meta, node->left->var);
                 instr.I.op = expr_result.value;
                 instr.I.imm = R_ZERO;
-            
+                
                 add_instr(instr, node->line_text, meta);
             }
             else
@@ -1669,10 +1676,10 @@ gen_assign(Node* node, Metadata* meta)
             }
             instr.I.dest = opReg = get_reg(meta);
             instr.I.op = R_ZERO;
-
+            
             add_instr(instr, node->line_text, meta);
         }
-
+        
         gen_deref(node->left, meta, true, opReg);
     }
 }
