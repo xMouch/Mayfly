@@ -19,6 +19,7 @@ enum NodeType{
     N_MOD,
     N_NEG,
     N_DEREF,
+    N_ADDR,
     N_NOT,
     N_CMP_EQ,
     N_CMP_NEQ,
@@ -124,6 +125,7 @@ String type_to_str(NodeType t)
         case N_MOD:  return IR_CONSTZ("N_MOD");
         case N_NEG:  return IR_CONSTZ("N_NEG");
         case N_DEREF:  return IR_CONSTZ("N_DEREF");
+        case N_ADDR:  return IR_CONSTZ("N_ADDR");
         case N_NOT:  return IR_CONSTZ("N_NOT");
         case N_CMP_EQ:  return IR_CONSTZ("N_CMP_EQ");
         case N_CMP_NEQ:  return IR_CONSTZ("N_CMP_NEQ");

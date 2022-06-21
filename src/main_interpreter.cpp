@@ -331,24 +331,44 @@ int main(s32 argc, c8** argv)
                 *R(m, i.I.dest) = (s8)((s8)*R(m, i.I.op) << (s8)i.I.imm);
                 break;
             }
-            case OP_LOAD64:  
+            case OP_ILOAD64:
             {
                 *R(m, i.I.dest) = ((s64*)*R(m, i.I.op))[i.I.imm];
                 break;
             }
-            case OP_LOAD8:  
+            case OP_ILOAD8:
             {
                 *R(m, i.I.dest) = ((s8*)*R(m, i.I.op))[i.I.imm];
                 break;
             }
-            case OP_STORE64:  
+            case OP_ISTORE64:
             {
                 ((s64*)*R(m, i.I.dest))[i.I.imm] = *R(m, i.I.op);
                 break;
             }
-            case OP_STORE8:  
+            case OP_ISTORE8:
             {
                 ((s8*)*R(m, i.I.dest))[i.I.imm] = (s8)*R(m, i.I.op);
+                break;
+            }
+            case OP_LOAD64:
+            {
+                *R(m, i.R.dest) = ((s64*)*R(m, i.R.op1))[*R(m, i.R.op2)];
+                break;
+            }
+            case OP_LOAD8:
+            {
+                *R(m, i.R.dest) = ((s8*)*R(m, i.R.op1))[*R(m, i.R.op2)];
+                break;
+            }
+            case OP_STORE64:
+            {
+                ((s64*)*R(m, i.R.dest))[*R(m, i.R.op2)] = *R(m, i.R.op1);
+                break;
+            }
+            case OP_STORE8:
+            {
+                ((s8*)*R(m, i.R.dest))[*R(m, i.R.op2)] = (s8)*R(m, i.R.op1);
                 break;
             }
             case OP_ICMP_AND:  

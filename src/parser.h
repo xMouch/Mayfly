@@ -69,8 +69,9 @@ void inCompatibleDataError(Type left, Type right, String lineText){
 }
 
 Type convertNodes(Node** left, Node** right, bool assignment = false){
-    if((*left)->dataType.pointerLvl != (*right)->dataType.pointerLvl)
-        inCompatibleDataError((*left)->dataType, (*right)->dataType,(*left)->line_text);
+    if((assignment && (*right)->dataType.pointerLvl != 0 && (*left)->dataType.pointerLvl == 0 && (*left)->dataType.dataType != S64) ||
+        (!assignment && ((*right)->dataType.pointerLvl == 0 ^ (*left)->dataType.pointerLvl == 0)))
+        inCompatibleDataError((*left)->dataType, (*right)->dataType, (*left)->line_text);
     if((*left)->dataType.dataType != (*right)->dataType.dataType){
         if((*left)->dataType.pointerLvl != 0)
             return (*left)->dataType;
@@ -89,7 +90,7 @@ Type convertNodes(Node** left, Node** right, bool assignment = false){
 }
 
 Type convertNode(Type left, Node** right){
-    if(left.pointerLvl != (*right)->dataType.pointerLvl)
+    if(left.pointerLvl == 0 ^ (*right)->dataType.pointerLvl == 0)
         inCompatibleDataError(left, (*right)->dataType,(*right)->line_text);
     else if(left.dataType != (*right)->dataType.dataType)
     {
@@ -269,15 +270,22 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         if (accept(TOKEN_ID)){
             if (!accept('(')){
                 msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
-                if(accept('=')){
-                    Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
+                n = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
+                Token* curTok = p_currentToken;
+                while (accept('[')){
                     Node* right = expression();
-                    left = derefChain(left,pointerLvl);
-                    Type dataType = convertNodes(&left, &right, true);
-                    if (left->dataType.dataType == F64 && pointerLvl>0)
-                        operandError((Token_Type)'*',*left);
-                    n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=left,.right=right});
+                    expect(']');
+                    n = makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n,.right=right});
+                }
+                if(accept('=')){
+                    Node* right = expression();
+                    n = derefChain(n, pointerLvl);
+                    Type dataType = convertNodes(&n, &right, true);
+                    if (n->dataType.dataType == F64 && pointerLvl>0)
+                        operandError((Token_Type)'*',*n);
+                    n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=n,.right=right});
                 }else{
+                    p_currentToken = curTok;
                     previousToken();
                     n = expression();
                     n = derefChain(n, pointerLvl);
@@ -558,27 +566,42 @@ Node* term(){
     }
 }
 
+Node* exp1(){
+    Node* n = term();
+    while (accept('[')){
+        Node* right = expression();
+        expect(']');
+        n = makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n,.right=right});
+    }
+    return n;
+}
+
 //these are named after precedence level of treated operators
 //https://en.cppreference.com/w/c/language/operator_precedence
 Node* exp2(){ //TODO: operanderror for pointer types on most operations
     if (accept('-')){
-        Node* n = term();
+        Node* n = exp1();
         if(n->dataType.pointerLvl>0)
             operandError((Token_Type)'-', *n);
         return makeNode({.type=N_NEG,.dataType=n->dataType,.left=n});
     } else if (accept('*')){
-        Node* n = term();
+        Node* n = exp1();
         if (n->dataType.pointerLvl == 0)
             operandError((Token_Type)'*',*n);
         return makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n});
+    } else if (accept('&')){
+        Node* n = exp1();
+        if (n->dataType.pointerLvl == 0)
+            operandError((Token_Type)'&',*n);
+        return makeNode({.type=N_ADDR,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl+1},.left=n});
     } else if (accept('!')){
-        Node* n = term();
+        Node* n = exp1();
         if(n->dataType.pointerLvl>0)
             operandError((Token_Type)'-', *n);
         return makeNode({.type=N_NOT,.dataType={.dataType=S64, .pointerLvl=0},.left=n});
     } else {
         accept('+');
-        return term();
+        return exp1();
     }
 }
 
