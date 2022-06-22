@@ -129,7 +129,7 @@ enum Opcode
     OP_ILOAD8,
     OP_ISTORE64,
     OP_ISTORE8,
-
+    
     OP_ADDR,
     
     //J_Types
@@ -480,6 +480,14 @@ void print_instr(Instr instr, msi line_num, FILE* dst)
                 (s64)instr.C.imm,
                 (f64)instr.C.fImm);
     }
+    else if(instr.R.opcode == OP_CREATE_CONTEXT)
+    {
+        fprintf(dst, "%llu:  %.*s %s #%lli\n", 
+                line_num,
+                opcode_to_str((Opcode)instr.C.opcode),
+                print_fix_local(instr.C.dest,&arena).data,
+                (s64)instr.C.imm);
+    }
     // J TYPE
     else
     {
@@ -654,7 +662,7 @@ void gen_func(Node* node, Metadata* meta)
     Instr instr = {};
     
     instr.C.opcode = OP_CREATE_CONTEXT;
-    instr.C.imm = 0;
+    instr.C.imm = ARR_LEN(meta->cur_func->arguments);
     instr.C.dest = 0; 
     add_instr(instr, func_name_with_line_break, meta);
     
@@ -671,47 +679,12 @@ void gen_func(Node* node, Metadata* meta)
         instr.C.dest = R_FIRST_LOCAL;
         add_instr(instr, func_name_with_line_break, meta);
     }
-    else
-    {
-        instr.I.opcode = OP_IADD;
-        instr.I.imm = 0;
-        instr.I.op = R_RETURN_ADDR;
-        instr.I.dest = R_FIRST_LOCAL;
-        add_instr(instr, func_name_with_line_break, meta);
-    }
-    
     
     
     for(msi i = 0; i < ARR_LEN(meta->cur_func->arguments); ++i)
     {
         Variable* var = meta->cur_func->arguments[i];
-        
-        switch(var->type.dataType)
-        {
-            case C8:
-            {
-                if(var->type.pointerLvl == 0)
-                {
-                    instr.I.opcode = OP_8_IADD;
-                    instr.I.imm = 0;
-                    instr.I.op = R_FIRST_ARG + i;
-                    instr.I.dest = get_reg(meta, var);
-                    add_instr(instr, func_name_with_line_break, meta);
-                    break; 
-                }
-                //NOTE(Michael)FALLTHROUGH!
-            }
-            default:
-            {
-                instr.I.opcode = OP_IADD;
-                instr.I.imm = 0;
-                instr.I.op = R_FIRST_ARG + i;
-                instr.I.dest = get_reg(meta, var);
-                add_instr(instr, func_name_with_line_break, meta);
-                break;
-            }
-        }
-        
+        get_reg(meta, var); 
     }
     
     if(node->left)
@@ -1338,13 +1311,21 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
-                Instr instr={};
-                instr.I.opcode = OP_ICMP_EQ;
-                instr.I.imm = 0; //same as float 0
-                instr.I.dest = result.value;
-                instr.I.op = result.value;
-                add_instr(instr, node->line_text, meta);
+                if(res_right.constant && (res_right.type.dataType == S64 || res_right.type.dataType == C8))
+                {
+                    res_right.value++;
+                    result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
+                }
+                else
+                {
+                    result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
+                    Instr instr={};
+                    instr.I.opcode = OP_ICMP_EQ;
+                    instr.I.imm = 0; //same as float 0
+                    instr.I.dest = result.value;
+                    instr.I.op = result.value;
+                    add_instr(instr, node->line_text, meta);
+                }
             }
             break;
         }
@@ -1357,13 +1338,21 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             else
             {
-                result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
-                Instr instr={};
-                instr.I.opcode = OP_ICMP_EQ;
-                instr.I.dest = result.value;
-                instr.I.imm = 0;
-                instr.I.op = result.value;
-                add_instr(instr, node->line_text, meta);
+                if(res_right.constant && (res_right.type.dataType == S64 || res_right.type.dataType == C8))
+                {
+                    res_right.value--;
+                    result = gen_two_op(OP_CMP_GT, res_left, res_right, node->line_text, meta); 
+                }
+                else
+                {
+                    result = gen_two_op(OP_CMP_LT, res_left, res_right, node->line_text, meta); 
+                    Instr instr={};
+                    instr.I.opcode = OP_ICMP_EQ;
+                    instr.I.dest = result.value;
+                    instr.I.imm = 0;
+                    instr.I.op = result.value;
+                    add_instr(instr, node->line_text, meta);
+                }
             }
             break;
         }
@@ -1423,17 +1412,17 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                     Expr_Result index_expr = res_right;
                     if (index_expr.constant){
                         instr.I.opcode = 
-                                (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
+                        (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
                         instr.I.imm = get_int_value(index_expr);
                     } else {
                         instr.R.opcode = 
-                                (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_LOAD8 : OP_LOAD64;
+                        (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_LOAD8 : OP_LOAD64;
                         instr.R.op2 = index_expr.value;
                     }
                 }
                 else{
                     instr.I.opcode = 
-                               (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
+                    (res_left.type.dataType == C8 && res_left.type.pointerLvl == 1) ? OP_ILOAD8 : OP_ILOAD64;
                     instr.I.imm = 0;
                 }
                 
@@ -1461,16 +1450,16 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             }
             result.tmp = true;
             result.constant = false;
-
+            
             Instr instr = {};
             instr.I.opcode = OP_ADDR;
             instr.I.imm = 0;
             instr.I.dest = get_reg(meta); //even if temporary reg we don't overwrite
             instr.I.op = res_left.value;
-
+            
             result.value = instr.I.dest;
             add_instr(instr, node->line_text, meta);
-
+            
             break;
         }
         case N_NOT:
@@ -1560,8 +1549,8 @@ gen_deref(Node* node, Metadata* meta, b8 firstExec, s64 opReg){
             Expr_Result index_expr = gen_expr(node->right, meta);
             if (index_expr.constant){
                 storeInstr.I.opcode = 
-                    (node->left->dataType.dataType==C8 &&
-                     node->left->dataType.pointerLvl == 1) ? OP_ISTORE8 : OP_ISTORE64;
+                (node->left->dataType.dataType==C8 &&
+                 node->left->dataType.pointerLvl == 1) ? OP_ISTORE8 : OP_ISTORE64;
                 storeInstr.I.imm = get_int_value(index_expr);
             } else {
                 storeInstr.R.opcode = (node->left->dataType.dataType==C8 &&
