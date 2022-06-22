@@ -1775,6 +1775,7 @@ void gen_if(Node* node, Metadata* meta)
         b_instr.I.op = expr_res.value;  
         b_instr.I.imm = 0;
         
+        
         add_instr(b_instr, node->line_text, meta);
         
         if(node->right->type == N_ELSE)

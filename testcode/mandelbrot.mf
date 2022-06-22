@@ -83,8 +83,16 @@ fn main() : s64
 			f64 lx = lerp(x_min, x_max, x/fw);
 			f64 ly = lerp(y_min, y_max, y/fh);
 			s64 n = mandel_pixel(lx, ly, iter);
-			printS64(n);
+			if(n == -1)
+			{
+				print("#");
+			}
+			else
+			{
+				printS64(n);
+			}
 		}
+		print("\n");
 	}
 
 	return 0;
