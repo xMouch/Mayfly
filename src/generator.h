@@ -864,7 +864,7 @@ Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, Strin
             instr.I.op = R_ZERO;
             add_instr(instr, cur_line, meta);
             
-            u8 tempReg = instr.I.dest;
+            u64 tempReg = instr.I.dest;
             
             if (floatOp)
             {
@@ -1787,7 +1787,7 @@ void gen_if(Node* node, Metadata* meta)
             Instr j_instr = {};
             j_instr.J.opcode = OP_JMP;
             j_instr.J.jmp = 0;
-            add_instr(j_instr, node->line_text, meta);
+            add_instr(j_instr, IR_CONSTZ("endif\n"), meta);
             
             meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
             
