@@ -851,6 +851,16 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
     ARR_PUSH(p_functions, builtIn);
 
+    builtIn.name = IR_CONSTZ("print");
+    builtIn.returnType = {.dataType=S64, .pointerLvl=0};
+    builtIn.jmp_loc = (s64)-4;
+    ARR_INIT(builtIn.arguments, 1, heap);
+    v.type = {.dataType=C8, .pointerLvl=1};
+    v.name = IR_CONSTZ("string");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(p_functions, builtIn);
+
     p_heap = heap;
     nextToken();
     Node* ast = program();

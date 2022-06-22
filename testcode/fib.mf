@@ -1,7 +1,7 @@
 
 fn fib(s64 n) : s64
 {
-	if(n <=1)
+	if(n <= 1)
 	{
 		return n;
 	}

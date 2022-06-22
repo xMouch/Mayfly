@@ -1,0 +1,6 @@
+fn main() : s64
+{
+	c8* str = "Hello\n";
+	print(str);
+	return 0;
+}
