@@ -129,8 +129,9 @@ enum Opcode
     OP_ILOAD8,
     OP_ISTORE64,
     OP_ISTORE8,
-    
-    OP_ADDR,
+
+    OP_IADDR,
+    OP_STR,
     
     //J_Types
     OP_JMP,
@@ -213,6 +214,8 @@ struct Metadata
     Instr* instr_list; 
     Instr* last_gen_instr;
     String* line_to_instr_list;
+
+    String* str_literals;
     
     
     Meta_Loop_Manip* loop_manips;
@@ -314,7 +317,8 @@ String opcode_to_str(Opcode opcode)
         case OP_ILOAD8:  return IR_CONSTZ("OP_ILOAD8");
         case OP_ISTORE64:  return IR_CONSTZ("OP_ISTORE64");
         case OP_ISTORE8:  return IR_CONSTZ("OP_ISTORE8");
-        case OP_ADDR:  return IR_CONSTZ("OP_ADDR");
+        case OP_IADDR:  return IR_CONSTZ("OP_IADDR");
+        case OP_STR:  return IR_CONSTZ("OP_STR");
         case OP_LOAD64:  return IR_CONSTZ("OP_LOAD64");
         case OP_LOAD8:  return IR_CONSTZ("OP_LOAD8");
         case OP_STORE64:  return IR_CONSTZ("OP_STORE64");
@@ -518,6 +522,11 @@ void print_all_instr(Metadata* meta)
     
     String prev_line = {};// meta->line_to_instr_list[0];
     msi line_num = 0;
+
+    for(msi i = 0; i < ARR_LEN(meta->str_literals); ++i)
+    {
+        fprintf(dst, "\033[32m.strLit: \"%.*s\"\033[97m\n", meta->str_literals[i]);
+    }
     
     meta->instr_list[0].J.jmp = ARR_LEN(meta->instr_list);
     
@@ -554,6 +563,16 @@ void generate_binary(c8* binary_loc, Metadata* meta)
 {   
     FILE* bin_file;
     bin_file = fopen(binary_loc, "wb");
+
+    msi lit_cnt = ARR_LEN(meta->str_literals);
+    fwrite(&lit_cnt, sizeof(lit_cnt), 1, bin_file);
+
+    for (msi i = 0; i < ARR_LEN(meta->str_literals); i++){
+        msi ln = meta->str_literals[i].length + 1;
+        fwrite(&ln, sizeof(ln), 1, bin_file);
+        fwrite(meta->str_literals[i].data, meta->str_literals[i].length, 1, bin_file);
+        fwrite("\0", 1, 1, bin_file);
+    }
     
     meta->instr_list[0].J.jmp = ARR_LEN(meta->instr_list);
     
@@ -1024,6 +1043,22 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             result.tmp =false;
             break;
         }
+        case N_STR:
+        {
+            result.constant =false;
+            result.tmp =true;
+
+            Instr instr={};
+            instr.I.opcode = OP_STR;
+            instr.I.dest = get_reg(meta);
+            instr.I.imm = ARR_LEN(meta->str_literals);
+            ARR_PUSH(meta->str_literals, node->str); //todo null terminate
+            instr.I.op = R_ZERO;
+
+            result.value = instr.I.dest;
+            add_instr(instr, node->line_text, meta);
+            break;
+        }
         case N_VAR:
         {
             result.value = node->var->reg;
@@ -1452,7 +1487,7 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
             result.constant = false;
             
             Instr instr = {};
-            instr.I.opcode = OP_ADDR;
+            instr.I.opcode = OP_IADDR;
             instr.I.imm = 0;
             instr.I.dest = get_reg(meta); //even if temporary reg we don't overwrite
             instr.I.op = res_left.value;
@@ -2107,6 +2142,7 @@ Metadata generate(Node* ast, msi reg_max, Heap_Allocator* heap)
     ARR_INIT(meta.instr_list, 128, heap);
     ARR_INIT(meta.line_to_instr_list, 128, heap);
     ARR_INIT(meta.loop_manips, 16, heap);
+    ARR_INIT(meta.str_literals, 16, heap);
     
     Instr init_jmp = {};
     init_jmp.J.opcode = OP_JMP;

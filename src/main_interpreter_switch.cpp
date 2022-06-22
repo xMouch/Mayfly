@@ -1,25 +1,38 @@
 #include "generator.h"
 
-Instr* read_entire_file(c8* file_name, Heap_Allocator* heap)
+Instr* read_entire_file(c8* file_name, Heap_Allocator* heap, String** str_literals)
 {
     FILE* file;
     file = fopen(file_name, "rb+");
-    
-    u64 file_size = 0;
-    
+
+    ARR_INIT(*str_literals, 5, heap);
+
+    msi lit_cnt;
+    fread(&lit_cnt, sizeof(lit_cnt),1, file);
+    for (msi i = 0; i<lit_cnt; i++){
+        msi ln;
+        fread(&ln, sizeof(ln),1, file);
+        String s = create_buffer(ln, heap->arena);
+        fread(s.data, sizeof(c8)*ln,1, file);
+        s.length = ln;
+
+        ARR_PUSH(*str_literals, s);
+    }
+
+    u64 instr_start = ftell(file);
     fseek(file, 0, SEEK_END);
-    file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    
+    u64 instr_size = ftell(file) - instr_start;
+    fseek(file, instr_start, SEEK_SET);
+
     Instr* result = nullptr;
-    
-    msi num_instr = file_size/sizeof(Instr);
-    
+
+    msi num_instr = instr_size/sizeof(Instr);
+
     ARR_INIT(result, num_instr, heap);
-    
-    fread(result, file_size, 1, file);
-    
-    arr_header(result)->length = file_size/sizeof(Instr);
+
+    fread(result, instr_size, 1, file);
+
+    arr_header(result)->length = instr_size/sizeof(Instr);
     
     fclose(file);
     
@@ -99,9 +112,11 @@ int main(s32 argc, c8** argv)
     Heap_Allocator heap = create_heap(&arena, IR_MEGABYTES(512), 0);
     
     Instr* instr_list;
+
+    String* str_literals;
     
     if (argc > 1){
-        instr_list = read_entire_file(argv[1], &heap);
+        instr_list = read_entire_file(argv[1], &heap, &str_literals);
     }else
     {
         fprintf(stdout, "USAGE: ./mayfly <path to binary>\n");
@@ -359,7 +374,7 @@ int main(s32 argc, c8** argv)
                 ++(*R(m, R_PROG_CNT));
                 break;
             }
-            case OP_ADDR:
+            case OP_IADDR:
             {
                 *R(m, i.I.dest) = (s64)R(m, i.I.op);
                 ++(*R(m, R_PROG_CNT));
@@ -557,6 +572,12 @@ int main(s32 argc, c8** argv)
                 ++(*R(m, R_PROG_CNT));
                 break;
             }
+            case OP_STR:
+            {
+                *R(m, i.I.dest) = (s64)str_literals[*R(m, i.I.op)].data;
+                ++maschine.r[0][R_PROG_CNT];
+                break;
+            }
             case OP_JMP:  
             {
                 if(i.J.jmp == (u64) -1)
@@ -580,6 +601,14 @@ int main(s32 argc, c8** argv)
                     *R(m, R_RETURN) = 0;
                     printf("%f\n", *RF(m, R_FIRST_ARG));
                     *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
+                }
+                else if(i.J.jmp == (u64) -4)
+                {
+                    //PRINTSTRING
+                    *R(m, R_RETURN) = 0;
+                    printf((c8*)*R(m, R_FIRST_ARG));
+                    *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
+                    break;
                 }
                 else
                 {
