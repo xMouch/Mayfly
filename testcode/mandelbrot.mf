@@ -37,7 +37,6 @@ fn mandel_pixel(f64 cx, f64 cy, s64 iter) : s64
 
 fn main() : s64
 {
-
 	s64 width = 1280;
 	s64 height = 720;
 	f64 fw = width;
@@ -76,8 +75,7 @@ fn main() : s64
 		}
 	}
 
-	
-    stbi_write_bmp("mandelb.bmp",width,height,3,img);
+    	stbi_write_bmp("mandelb.bmp",width,height,3,img);
 
 	return 0;
 }
