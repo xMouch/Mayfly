@@ -62,38 +62,41 @@ fn lerp(f64 v0, f64 v1, f64 t) : f64
 fn main() : s64
 {
 
-	s64 width = 100;
-	s64 height = 60;
+	s64 width = 400;
+	s64 height = 300;
 	f64 fw = width;
 	f64 fh = height;
-	s64 iter = 3;
+	s64 iter = 15;
 
 	f64 x_min = -1.5;
 	f64 x_max = 1.5;
+	f64 y_min = -1;
+	f64 y_max = 1;
 
-
-	f64 y_min = -1.5;
-	f64 y_max = 1.5;
+	c8* img = realloc(img, width * height);
 	
 
-	for(s64 x = 0; x < width; x = x + 1)
+	for(s64 y = 0; y < height; y = y + 1)
 	{
-		for(s64 y = 0; y < height; y = y + 1)
+		for(s64 x = 0; x < width; x = x + 1)
 		{
 			f64 lx = lerp(x_min, x_max, x/fw);
 			f64 ly = lerp(y_min, y_max, y/fh);
 			s64 n = mandel_pixel(lx, ly, iter);
+			
 			if(n == -1)
 			{
-				print("#");
+				img[x + y * width] = 255;
 			}
 			else
 			{
-				printS64(n);
-			}
+				img[x + y * width] = n * (250.0/iter);
+			} 
 		}
-		print("\n");
 	}
+
+	
+    stbi_write_bmp("mandel.bmp",width,height,1,img);
 
 	return 0;
 }
