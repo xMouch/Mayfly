@@ -1781,10 +1781,19 @@ void gen_if(Node* node, Metadata* meta)
         if(node->right->type == N_ELSE)
         {
             gen_node(node->right->left, meta);
+
+            msi jmp_index = meta->cur_line;
+
+            Instr j_instr = {};
+            j_instr.J.opcode = OP_JMP;
+            j_instr.J.jmp = 0;
+            add_instr(j_instr, node->line_text, meta);
             
             meta->instr_list[branch_index].I.imm = meta->cur_line - branch_index -1;
             
             gen_node(node->right->right, meta);
+            
+            meta->instr_list[jmp_index].J.jmp = meta->cur_line;
         }
         else
         {
