@@ -752,7 +752,27 @@ void assign_expr_value(Expr_Result &res, f64 value){
         res.cValue = (c8)value;
 }
 
+static void constant_check(Expr_Result* expr_result, Metadata* meta, String line_text)
+{
+    if((expr_result->constant &&
+    expr_result->type.dataType == S64 &&
+    s64_abs(expr_result->value) > 2147483647)
+    || (expr_result->constant &&
+    expr_result->type.dataType == F64 &&
+    !f64_eq(expr_result->value, (f32)expr_result->value)))
+    {
+        Instr instr;
+        instr.C.opcode = OP_WRITE_CONSTANT;
+        instr.C.imm = expr_result->value;
+        instr.C.dest = get_reg(meta);
 
+        expr_result->constant = false;
+        expr_result->tmp = true;
+        expr_result->value = instr.C.dest;
+
+        add_instr(instr, line_text, meta);
+    }
+}
 
 static
 Expr_Result gen_two_op(Opcode opcode, Expr_Result left, Expr_Result right, String cur_line, Metadata* meta)
@@ -949,13 +969,13 @@ Expr_Result gen_func_call(Node* node, Metadata* meta)
     for(msi i = 0; i < num_args; ++i)
     {
         Expr_Result arg_result = gen_expr(cur_arg->left, meta);
+
         if(arg_result.constant)
         {
             Instr instr = {};
-            instr.I.opcode = OP_IADD;
-            instr.I.dest = R_FIRST_ARG + i;
-            instr.I.op = R_ZERO;
-            instr.I.imm = arg_result.value;
+            instr.C.dest = R_FIRST_ARG + i;
+            instr.C.opcode = OP_WRITE_CONSTANT;
+            instr.C.imm = arg_result.value;
             add_instr(instr, node->line_text, meta);   
         }
         else if(arg_result.tmp)
@@ -1618,24 +1638,8 @@ gen_assign(Node* node, Metadata* meta)
     b8 isC8 = node->left->dataType.dataType == C8 && expr_result.type.pointerLvl == 0;
     
     Instr instr = {};
-    
-    if((expr_result.constant &&
-        expr_result.type.dataType == S64 &&
-        s64_abs(expr_result.value) > 2147483647)
-       || (expr_result.constant &&
-           expr_result.type.dataType == F64 &&
-           !f64_eq(expr_result.value, (f32)expr_result.value)))
-    {
-        instr.C.opcode = OP_WRITE_CONSTANT;
-        instr.C.imm = expr_result.value;
-        instr.C.dest = get_reg(meta);
-        
-        expr_result.constant = false;
-        expr_result.tmp = true;
-        expr_result.value = instr.C.dest;
-        
-        add_instr(instr, node->line_text, meta);
-    }
+
+    constant_check(&expr_result, meta, node->line_text);
     
     if (node->left->type != N_DEREF){
         if(expr_result.constant)
