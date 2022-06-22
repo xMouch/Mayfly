@@ -599,9 +599,7 @@ Node* exp2(){ //TODO: operanderror for pointer types on most operations
         return makeNode({.type=N_DEREF,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl-1},.left=n});
     } else if (accept('&')){
         Node* n = exp1();
-        if (n->dataType.pointerLvl == 0)
-            operandError((Token_Type)'&',*n);
-        return makeNode({.type=N_ADDR,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl+1},.left=n});
+        return makeNode({.type=N_IADDR,.dataType={.dataType=n->dataType.dataType, .pointerLvl=n->dataType.pointerLvl + 1},.left=n});
     } else if (accept('!')){
         Node* n = exp1();
         if(n->dataType.pointerLvl>0)
