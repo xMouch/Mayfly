@@ -861,6 +861,32 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
     ARR_PUSH(p_functions, builtIn);
 
+    builtIn.name = IR_CONSTZ("stbi_write_bmp");
+    builtIn.returnType = {.dataType=S64, .pointerLvl=0};
+    builtIn.jmp_loc = (s64)-5;
+    ARR_INIT(builtIn.arguments, 5, heap);
+    v.type = {.dataType=C8, .pointerLvl=1};
+    v.name = IR_CONSTZ("filename");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    v.type = {.dataType=S64, .pointerLvl=0};
+    v.name = IR_CONSTZ("w");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    v.type = {.dataType=S64, .pointerLvl=0};
+    v.name = IR_CONSTZ("h");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    v.type = {.dataType=S64, .pointerLvl=0};
+    v.name = IR_CONSTZ("comp");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    v.type = {.dataType=C8, .pointerLvl=1};
+    v.name = IR_CONSTZ("data");
+    v.global_loc = -1;
+    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(p_functions, builtIn);
+
     p_heap = heap;
     nextToken();
     Node* ast = program();

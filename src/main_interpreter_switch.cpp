@@ -1,5 +1,8 @@
 #include "generator.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb/stb_image_write.h"
+
 Instr* read_entire_file(c8* file_name, Heap_Allocator* heap, String** str_literals)
 {
     FILE* file;
@@ -607,6 +610,15 @@ int main(s32 argc, c8** argv)
                     //PRINTSTRING
                     *R(m, R_RETURN) = 0;
                     printf((c8*)*R(m, R_FIRST_ARG));
+                    *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
+                    break;
+                }
+                else if(i.J.jmp == (u64) -5)
+                {
+                    //Write image
+                    *R(m, R_RETURN) = 0;
+                    stbi_write_bmp((c8*)*R(m, R_FIRST_ARG), (s64)*R(m, R_FIRST_ARG+1), (s64)*R(m, R_FIRST_ARG+2),
+                                   (s64)*R(m, R_FIRST_ARG+3), (c8*)*R(m, R_FIRST_ARG+4));
                     *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
                     break;
                 }
