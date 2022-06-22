@@ -127,7 +127,7 @@ int main(s32 argc, c8** argv)
     
     b8 after_abs_jmp = false;
     
-    for(; *R(m,R_PROG_CNT) < ARR_LEN(instr_list) || (after_abs_jmp && *R(m, R_PROG_CNT) == ARR_LEN(instr_list)); ++(*R(m, R_PROG_CNT)))
+    for(;; ++(*R(m, R_PROG_CNT)))
     {
         
         if(after_abs_jmp)
