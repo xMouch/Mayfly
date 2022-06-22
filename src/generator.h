@@ -129,8 +129,8 @@ enum Opcode
     OP_ILOAD8,
     OP_ISTORE64,
     OP_ISTORE8,
-    
-    
+
+    OP_ADDR,
     
     //J_Types
     OP_JMP,
@@ -314,6 +314,7 @@ String opcode_to_str(Opcode opcode)
         case OP_ILOAD8:  return IR_CONSTZ("OP_ILOAD8");
         case OP_ISTORE64:  return IR_CONSTZ("OP_ISTORE64");
         case OP_ISTORE8:  return IR_CONSTZ("OP_ISTORE8");
+        case OP_ADDR:  return IR_CONSTZ("OP_ADDR");
         case OP_LOAD64:  return IR_CONSTZ("OP_LOAD64");
         case OP_LOAD8:  return IR_CONSTZ("OP_LOAD8");
         case OP_STORE64:  return IR_CONSTZ("OP_STORE64");
@@ -1450,6 +1451,26 @@ Expr_Result gen_expr(Node* node, Metadata* meta)
                 add_instr(instr, node->line_text, meta);
             }
             
+            break;
+        }
+        case N_IADDR:
+        {
+            if(res_left.constant || res_left.tmp)
+            {
+                IR_ASSERT(false && "Cannot take address of a constant or expression!\n")
+            }
+            result.tmp = true;
+            result.constant = false;
+
+            Instr instr = {};
+            instr.I.opcode = OP_ADDR;
+            instr.I.imm = 0;
+            instr.I.dest = get_reg(meta); //even if temporary reg we don't overwrite
+            instr.I.op = res_left.value;
+
+            result.value = instr.I.dest;
+            add_instr(instr, node->line_text, meta);
+
             break;
         }
         case N_NOT:

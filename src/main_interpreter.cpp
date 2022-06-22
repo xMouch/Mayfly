@@ -164,6 +164,7 @@ static void F_ILOAD64();
 static void F_ILOAD8();
 static void F_ISTORE64();
 static void F_ISTORE8();
+static void F_IADDR();
 static void F_JMP();
 static void F_JMPR();
 static void F_WRITE_CONSTANT();
@@ -264,6 +265,7 @@ int main(s32 argc, c8** argv)
     ARR_PUSH(instructions, F_ILOAD8);
     ARR_PUSH(instructions, F_ISTORE64);
     ARR_PUSH(instructions, F_ISTORE8);
+    ARR_PUSH(instructions, F_IADDR);
     ARR_PUSH(instructions, F_JMP);
     ARR_PUSH(instructions, F_JMPR);
     ARR_PUSH(instructions, F_WRITE_CONSTANT);
@@ -617,6 +619,13 @@ void F_STORE8()
 {
     ((s8*)*R(m, i.R.dest))[*R(m, i.R.op2)] = (s8)*R(m, i.R.op1);
     ++(*R(m, R_PROG_CNT));    
+}
+
+static
+void F_IADDR()
+{
+    *R(m, i.I.dest) = (s64)R(m, i.I.op);
+    ++(*R(m, R_PROG_CNT));
 }
 
 static
