@@ -733,7 +733,7 @@ int main(s32 argc, c8** argv)
 
     L_STR:
     {
-        *R(m, i.I.dest) = (s64)str_literals[*R(m, i.I.op)].data;
+        *R(m, i.I.dest) = (s64)str_literals[i.I.imm].data;
         ++maschine.r[0][R_PROG_CNT];
         goto NEXT;
     }
@@ -770,7 +770,7 @@ int main(s32 argc, c8** argv)
             {
                 //PRINTSTRING
                 *R(m, R_RETURN) = 0;
-                printf((c8*)*R(m, R_FIRST_ARG));
+                printf("%s", (c8*)*R(m, R_FIRST_ARG));
                 *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
                 break;
             }
