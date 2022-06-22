@@ -1,0 +1,13 @@
+
+fn mandel_pixel(s64 cx, s64 cy) : s64
+{
+	
+}
+
+
+
+fn main() : s64
+{
+
+	return 0;
+}

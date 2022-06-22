@@ -1,0 +1,19 @@
+fn sqrt(f64 x) : f64
+{
+	f64 y = 1;
+	f64 py = 0;
+	while((y - py) > 0.00000001 || (y - py) < -0.00000001)
+	{
+		py = y;
+		y = (y + x/y)/2.0;
+	}
+
+	return y;
+}
+
+fn main() : s64
+{
+	printF64(sqrt(2.0));
+	print("\n");
+	return 0;
+}

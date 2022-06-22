@@ -247,15 +247,15 @@ Token* tokenize(String file, Heap_Allocator* heap)
                 }
                 else
                 {
-                    adv_chars(&t, 1);
                     ARR_PUSH(str_lit.data, t.n[0]);
+                    adv_chars(&t, 1);
                 }
             }
             
             if(t.n[0] == '"')
                 adv_chars(&t, 1);
             
-            
+            str_lit.length = ARR_LEN(str_lit.data);
             token.text.length = str_lit.length;
             token.text.data = str_lit.data;
             ARR_PUSH(t.str_literals, str_lit); 

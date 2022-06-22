@@ -574,7 +574,7 @@ int main(s32 argc, c8** argv)
             }
             case OP_STR:
             {
-                *R(m, i.I.dest) = (s64)str_literals[i.I.imm].data;
+                *R(m, i.I.dest) = (s64)str_literals[*R(m, i.I.op)].data;
                 ++maschine.r[0][R_PROG_CNT];
                 break;
             }
@@ -591,7 +591,7 @@ int main(s32 argc, c8** argv)
                 {
                     //PRINTS64
                     *R(m, R_RETURN) = 0;
-                    printf("%lli\n", *R(m, R_FIRST_ARG));
+                    printf("%lli", *R(m, R_FIRST_ARG));
                     *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
                 }
                 else if(i.J.jmp == (u64) -3)
@@ -599,7 +599,7 @@ int main(s32 argc, c8** argv)
                     //PRINTF64
                     //PRINTS64
                     *R(m, R_RETURN) = 0;
-                    printf("%f\n", *RF(m, R_FIRST_ARG));
+                    printf("%f", *RF(m, R_FIRST_ARG));
                     *R(m, R_PROG_CNT) = *R(m, R_RETURN_ADDR);
                 }
                 else if(i.J.jmp == (u64) -4)
