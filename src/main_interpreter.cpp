@@ -719,14 +719,14 @@ int main(s32 argc, c8** argv)
     
     L_F_ICMP_LT:  
     {
-        *R(m, i.I.dest) = *RF(m, i.I.op) < i.I.imm;
+        *R(m, i.I.dest) = *RF(m, i.I.op) < i.I.fImm;
         ++maschine.r[0][R_PROG_CNT];    
         goto NEXT;    
     }
     
     L_F_ICMP_GT:  
     {
-        *R(m, i.I.dest) = *RF(m, i.I.op) > i.I.imm;   
+        *R(m, i.I.dest) = *RF(m, i.I.op) > i.I.fImm;   
         ++maschine.r[0][R_PROG_CNT];    
         goto NEXT;    
     }

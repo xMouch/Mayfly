@@ -565,13 +565,13 @@ int main(s32 argc, c8** argv)
             }
             case OP_F_ICMP_LT:  
             {
-                *R(m, i.I.dest) = *RF(m, i.I.op) < i.I.imm;
+                *R(m, i.I.dest) = *RF(m, i.I.op) < i.I.fImm;
                 ++(*R(m, R_PROG_CNT));
                 break;
             }
             case OP_F_ICMP_GT:  
             {
-                *R(m, i.I.dest) = *RF(m, i.I.op) > i.I.imm;
+                *R(m, i.I.dest) = *RF(m, i.I.op) > i.I.fImm;
                 ++(*R(m, R_PROG_CNT));
                 break;
             }

@@ -1,13 +1,91 @@
-
-fn mandel_pixel(s64 cx, s64 cy) : s64
+/*
+fn sqrt(f64 x) : f64
 {
-	
+	f64 y = 1;
+	f64 py = 0;
+	while((y - py) > 0.00000001 || (y - py) < -0.00000001)
+	{
+		py = y;
+		y = (y + x/y)/2.0;
+	}
+
+	return y;
+}
+*/
+
+
+/*
+fn c_sq(f64 cx, f64 cy, f64* crx, f64* cry) : s64
+{
+	*crx = cx * cx - cy * cy;
+	*cry = cx * cy + cx * cy;
+	return 0;
+}
+*/
+
+fn len(f64 cx, f64 cy) : f64
+{
+	return cx*cx + cy*cy;
 }
 
+fn mandel_pixel(f64 cx, f64 cy, s64 iter) : s64
+{
+
+	f64 zx = 0;
+	f64 zy = 0;
+	s64 result = -1;
+	
+	for(s64 i = 0; i < iter; i = i + 1)
+	{
+		if(len(zx, zy) > 4.0)
+		{
+			result = i;
+			break;
+		}
+		
+		f64 zxsq =  zx * zx - zy * zy;
+		f64 zysq =  zx * zy + zx * zy;
+		
+		zx = zxsq + cx;
+		zy = zysq + cy;
+	}
+
+	return result;
+}
+
+fn lerp(f64 v0, f64 v1, f64 t) : f64
+{
+	return (1 - t) * v0 + t * v1;	
+}
 
 
 fn main() : s64
 {
+
+	s64 width = 100;
+	s64 height = 60;
+	f64 fw = width;
+	f64 fh = height;
+	s64 iter = 3;
+
+	f64 x_min = -1.5;
+	f64 x_max = 1.5;
+
+
+	f64 y_min = -1.5;
+	f64 y_max = 1.5;
+	
+
+	for(s64 x = 0; x < width; x = x + 1)
+	{
+		for(s64 y = 0; y < height; y = y + 1)
+		{
+			f64 lx = lerp(x_min, x_max, x/fw);
+			f64 ly = lerp(y_min, y_max, y/fh);
+			s64 n = mandel_pixel(lx, ly, iter);
+			printS64(n);
+		}
+	}
 
 	return 0;
 }
