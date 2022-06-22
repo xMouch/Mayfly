@@ -39,13 +39,12 @@ fn main() : s64
 
 		for(s64 j = 0; j < dracula2; j = j + 1)
 		{
-			arrays_of_doom[i][j] = 2;
+			arrays_of_doom[i][j] = i * j;
 		}
 
 	}
 
 	
 
-    return massive_add(arrays_of_doom[0], dracula2);
-//add_ALL_THE_THINGS(arrays_of_doom, dracula1, dracula2);
+    return add_ALL_THE_THINGS(arrays_of_doom, dracula1, dracula2);
 }

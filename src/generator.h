@@ -78,7 +78,7 @@ enum Opcode
     
     //I_TYPES
     //INTEGER
-    OP_IADD = 64,
+    OP_IADD,
     OP_ISUB,
     OP_IMUL,
     OP_IDIV,
@@ -138,9 +138,10 @@ enum Opcode
     
     //C_TYPE
     OP_WRITE_CONSTANT,
-    OP_BUILTIN,
     OP_CREATE_CONTEXT,
     
+    
+    OP_NUM_INSTRUCTIONS,
     /*
     //STACK
     OP_PUSH, //
@@ -345,7 +346,6 @@ String opcode_to_str(Opcode opcode)
         case OP_8_ISHIFT_R:  return IR_CONSTZ("OP_8_ISHIFT_R");
         case OP_8_ISHIFT_L:  return IR_CONSTZ("OP_8_ISHIFT_L");
         case OP_WRITE_CONSTANT:  return IR_CONSTZ("OP_WRITE_CONSTANT");
-        case OP_BUILTIN:  return IR_CONSTZ("OP_BUILTIN");
         case OP_CREATE_CONTEXT:  return IR_CONSTZ("OP_CREATE_CONTEXT");
         default: return IR_CONSTZ("OPCODE PRINT NOT IMPLEMENTED");
     }

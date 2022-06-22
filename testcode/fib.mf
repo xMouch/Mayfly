@@ -1,0 +1,20 @@
+
+fn fib(s64 n) : s64
+{
+	if(n <=1)
+	{
+		return n;
+	}
+	return fib(n-1) + fib(n-2);
+}
+
+
+fn main() : s64
+{
+	for(s64 i = 0; i < 35; i = i+1)
+	{
+		printS64(fib(i));
+	}
+	
+	return 1;
+}
