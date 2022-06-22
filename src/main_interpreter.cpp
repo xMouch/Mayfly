@@ -730,7 +730,7 @@ int main(s32 argc, c8** argv)
 
     L_STR:
     {
-        *R(m, i.I.dest) = (s64)str_literals[*R(m, i.I.op)].data;
+        *R(m, i.I.dest) = (s64)str_literals[i.I.imm].data;
         ++maschine.r[0][R_PROG_CNT];
         goto NEXT;
     }
