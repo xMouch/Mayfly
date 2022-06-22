@@ -6,6 +6,7 @@ struct Tokenizer
     String file;
     String line_text;
     Token* tokens;
+    String* str_literals;
     c8  n[2];
     msi cur;
     msi cur_line;
@@ -17,6 +18,8 @@ Tokenizer create_tokenizer(String file, Heap_Allocator* heap)
 {
     Tokenizer t = {};
     t.file = file;
+    t.str_literals = nullptr;
+    ARR_INIT(t.str_literals, 16, heap);
     ARR_INIT(t.tokens, 64, heap);
     
     t.cur_line = 1;
@@ -221,11 +224,10 @@ Token* tokenize(String file, Heap_Allocator* heap)
         
         if(t.n[0] == '"')
         {
+            String str_lit;
+            ARR_INIT(str_lit.data, 4, heap);
             token.type = TOKEN_STR_LIT;
             adv_chars(&t, 1);
-            
-            token.text.length = 0;
-            token.text.data = &t.file.data[t.cur];
             token.line = t.cur_line;
             token.column = t.cur_column;
             
@@ -235,19 +237,28 @@ Token* tokenize(String file, Heap_Allocator* heap)
                 if(t.n[0] == '\\' && t.n[1] == '"')
                 {
                     adv_chars(&t, 2);
-                    token.text.length+=2;
+                    ARR_PUSH(str_lit.data, t.n[0]);
+                    ARR_PUSH(str_lit.data, t.n[1]);
+                }
+                else if(t.n[0] == '\\' && t.n[1] == 'n')
+                {
+                    adv_chars(&t, 2);
+                    ARR_PUSH(str_lit.data, '\n');
                 }
                 else
                 {
+                    ARR_PUSH(str_lit.data, t.n[0]);
                     adv_chars(&t, 1);
-                    ++token.text.length;
                 }
             }
             
             if(t.n[0] == '"')
                 adv_chars(&t, 1);
             
-            
+            str_lit.length = ARR_LEN(str_lit.data);
+            token.text.length = str_lit.length;
+            token.text.data = str_lit.data;
+            ARR_PUSH(t.str_literals, str_lit); 
             ARR_PUSH(t.tokens, token);
             continue;
         }
