@@ -1,4 +1,4 @@
 #!/bin/bash
 
-./mayflyc
-./mayfly binary.mayfly
+./mayflyc testcode/mandelbrot.mf 
+./mayfly mandelbrot.mayfly

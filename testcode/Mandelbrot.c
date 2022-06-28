@@ -57,7 +57,8 @@ int main()
 	f64 y_min = -1.2;
 	f64 y_max = 1.2;
 
-	c8* img = (c8*)realloc(img, width * height * 3);
+	c8* img = 0;
+    img = (c8*)malloc(width * height * 3);
 	
 
 	for(s64 y = 0; y < height; y = y + 1)

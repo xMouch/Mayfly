@@ -8,14 +8,14 @@ Token* p_currentToken;
 Token* p_tokens;
 c8 p_parsing;
 
-Node* p_nodes;
-Variable* p_variables;
+Node* p_nodes_bl;
+Variable* p_variables_bl;
 Variable** p_variablesInScope;
 msi p_currentScope;
 
 msi global_cnt = 0;
 
-Function* p_functions;
+Function* p_functions_bl;
 
 Token getPreviousToken(msi howFarBack);
 
@@ -49,8 +49,8 @@ NodeType dataTypeToConversionOp(DataType d){
 
 Node* makeNode(Node newNode, s64 textOffset = 0){
     newNode.line_text = getPreviousToken(-textOffset).line_text;
-    ARR_PUSH(p_nodes, newNode);
-    return ARR_LAST(p_nodes);
+    BL_PUSH(p_nodes_bl, newNode);
+    return BL_LAST(p_nodes_bl);
 }
 
 void operandError(Token_Type operation, Node node){
@@ -189,7 +189,7 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal =
         Variable v{};
         v.level = p_currentScope;
         v.type = {.dataType=tokenTypeToDatatype(declarationType), .pointerLvl=pointerLvl};
-        v.id = ARR_LEN(p_variables);
+        v.id = BL_LEN(p_variables_bl);
         v.name = t.text;
         if(isGlobal)
         {
@@ -199,8 +199,8 @@ msi inspectId(Token_Type declarationType, msi pointerLvl, Token t, b8 isGlobal =
         {
             v.global_loc = (msi)-1;
         }
-        ARR_PUSH(p_variables,v);
-        ARR_PUSH(p_variablesInScope, ARR_LAST(p_variables));
+        BL_PUSH(p_variables_bl,v);
+        ARR_PUSH(p_variablesInScope, BL_LAST(p_variables_bl));
         return v.id;
     }
 }
@@ -259,7 +259,8 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         msi index = expectId(varType, pointerLvl);
 
         if((emptyAssignAllowed && accept('=')) || (!emptyAssignAllowed && expect('='))){
-            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
+            Node* left = makeNode({.type=N_VAR,.var=BL_GET(p_variables_bl, index),
+                             .dataType=BL_GET(p_variables_bl, index)->type});
             Node* right = expression();
             Type dataType = convertNodes(&left, &right, true);
             n = makeNode({.type=N_ASSIGN,.dataType=dataType,.left=left,.right=right});
@@ -274,7 +275,8 @@ Node* assignmentOrExpression(Token_Type varType, c8 emptyAssignAllowed){
         if (accept(TOKEN_ID)){
             if (!accept('(')){
                 msi index = inspectId(TOKEN_UNKOWN, pointerLvl, getPreviousToken(1));
-                n = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
+                n = makeNode({.type=N_VAR,.var=BL_GET(p_variables_bl, index),
+                                 .dataType=BL_GET(p_variables_bl, index)->type});
                 Token* curTok = p_currentToken;
                 while (accept('[')){
                     if (n->dataType.pointerLvl <= 0)
@@ -345,24 +347,24 @@ Node* function(c8 declaration){
         while(accept('*'))
             returnPointerLvl++;
         f.returnType = {.dataType=tokenTypeToDatatype(expectType()), .pointerLvl=returnPointerLvl}; //no support for void return
-        for (msi i = 0; i<ARR_LEN(p_functions); i++){
-            if (cmp_string(p_functions[i].name, f.name)){
+        for (msi i = 0; i<BL_LEN(p_functions_bl); i++){
+            if (cmp_string(BL_GET(p_functions_bl, i)->name, f.name)){
                 printf("Error, redeclared function at %llu:%llu\n", line, column);
                 exit(1);
             }
         }
-        ARR_PUSH(p_functions,f);
+        BL_PUSH(p_functions_bl,f);
         expect('{');
-        Node* n = makeNode({.type=N_FUNC,.func=ARR_LAST(p_functions), .dataType=f.returnType, .left=statements()});
+        Node* n = makeNode({.type=N_FUNC,.func=BL_LAST(p_functions_bl), .dataType=f.returnType, .left=statements()});
         decreaseScope();
         expect('}');
         return n;
     } else {
         expect(TOKEN_ID);
         Function* f = nullptr;
-        for (msi i = 0; i<ARR_LEN(p_functions); i++){
-            if (cmp_string(p_functions[i].name, getPreviousToken(1).text)){
-                f = &p_functions[i];
+        for (msi i = 0; i<BL_LEN(p_functions_bl); i++){
+            if (cmp_string(BL_GET(p_functions_bl, i)->name, getPreviousToken(1).text)){
+                f = BL_GET(p_functions_bl, i);
             }
         }
         if (f == nullptr){
@@ -523,7 +525,7 @@ Node* statement(){
     }
     if (accept(TOKEN_RETURN)){
         Node* left = expression();
-        Type returnType = convertNode(ARR_LAST(p_functions)->returnType, &left);
+        Type returnType = convertNode(BL_LAST(p_functions_bl)->returnType, &left);
         n = makeNode({.type=N_RETURN, .dataType=returnType, .left=left});
         expect(';');
         return n;
@@ -551,7 +553,8 @@ Node* term(){
         }
         else{
             msi index = inspectId(TOKEN_UNKOWN, 0, getPreviousToken(1));
-            return makeNode({.type=N_VAR, .var=&p_variables[index], .dataType=p_variables[index].type});
+            return makeNode({.type=N_VAR, .var=BL_GET(p_variables_bl, index),
+                                .dataType=BL_GET(p_variables_bl, index)->type});
         }
     }
     else if (accept(TOKEN_NUM)){
@@ -753,7 +756,8 @@ Node* block(){
             pointerLvl++;
         msi index = expectId(t, pointerLvl, true);
         if (accept('=')){
-            Node* left = makeNode({.type=N_VAR,.var=&p_variables[index],.dataType=p_variables[index].type});
+            Node* left = makeNode({.type=N_VAR,.var=BL_GET(p_variables_bl, index),
+                                      .dataType=BL_GET(p_variables_bl, index)->type});
             Node* right = expression();
             Type type = convertNodes(&left, &right, true);
             node = makeNode({.type=N_ASSIGN, .dataType=type, .left=left,.right=right});
@@ -780,7 +784,7 @@ void printVar(Variable v){
 
 void printTree(Node* n, s64 offset){
     if (n != nullptr){
-        printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
+        printf("%.*s", offset * 2, "| | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | ");
         if(n->type==N_VAR){
             printVar(*n->var);
         }else if(n->type==N_FUNC||n->type==N_FUNC_CALL){
@@ -810,10 +814,10 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     p_tokens = tokens;
     p_currentIndex = -1;
     p_parsing = true;
-    ARR_INIT(p_nodes,226, heap);
-    ARR_INIT(p_variables,64, heap);
+    BL_INIT(p_nodes_bl, 64, heap);
+    BL_INIT(p_variables_bl,64, heap);
+    BL_INIT(p_functions_bl,64, heap);
     ARR_INIT(p_variablesInScope,64, heap);
-    ARR_INIT(p_functions,8, heap);
 
     Function builtIn = {};
     builtIn.name = IR_CONSTZ("realloc");
@@ -824,12 +828,12 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     v.type = {.dataType=S64, .pointerLvl=1};
     v.name = IR_CONSTZ("ptr");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("new_size");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, builtIn);
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
+    BL_PUSH(p_functions_bl, builtIn);
 
     builtIn.name = IR_CONSTZ("printS64");
     builtIn.returnType = {.dataType=S64, .pointerLvl=0};
@@ -838,8 +842,8 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("value");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, builtIn);
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
+    BL_PUSH(p_functions_bl, builtIn);
 
     builtIn.name = IR_CONSTZ("printF64");
     builtIn.returnType = {.dataType=S64, .pointerLvl=0};
@@ -848,8 +852,8 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     v.type = {.dataType=F64, .pointerLvl=0};
     v.name = IR_CONSTZ("value");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, builtIn);
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
+    BL_PUSH(p_functions_bl, builtIn);
 
     builtIn.name = IR_CONSTZ("print");
     builtIn.returnType = {.dataType=S64, .pointerLvl=0};
@@ -858,8 +862,8 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     v.type = {.dataType=C8, .pointerLvl=1};
     v.name = IR_CONSTZ("string");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, builtIn);
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
+    BL_PUSH(p_functions_bl, builtIn);
 
     builtIn.name = IR_CONSTZ("stbi_write_bmp");
     builtIn.returnType = {.dataType=S64, .pointerLvl=0};
@@ -868,33 +872,33 @@ Parser_Result parse(Token* tokens, Heap_Allocator* heap){
     v.type = {.dataType=C8, .pointerLvl=1};
     v.name = IR_CONSTZ("filename");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("w");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("h");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
     v.type = {.dataType=S64, .pointerLvl=0};
     v.name = IR_CONSTZ("comp");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
     v.type = {.dataType=C8, .pointerLvl=1};
     v.name = IR_CONSTZ("data");
     v.global_loc = -1;
-    ARR_PUSH(builtIn.arguments, ARR_PUSH(p_variables, v));
-    ARR_PUSH(p_functions, builtIn);
+    ARR_PUSH(builtIn.arguments, BL_PUSH(p_variables_bl, v));
+    BL_PUSH(p_functions_bl, builtIn);
 
     p_heap = heap;
     nextToken();
     Node* ast = program();
-    printTree(ast, 0);
+    //printTree(ast, 0);
     
     Parser_Result result;
     result.ast = ast;
-    result.reg_max = ARR_LEN(p_variables);
-    
+    result.reg_max = BL_LEN(p_variables_bl);
+   
     return result;
 }

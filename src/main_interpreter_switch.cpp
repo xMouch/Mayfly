@@ -122,7 +122,7 @@ int main(s32 argc, c8** argv)
         instr_list = read_entire_file(argv[1], &heap, &str_literals);
     }else
     {
-        fprintf(stdout, "USAGE: ./mayfly <path to binary>\n");
+        fprintf(stdout, "USAGE: ./mayfly_switch <input_path.mayfly>\n");
         return 0;
     }
     

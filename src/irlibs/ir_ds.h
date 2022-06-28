@@ -177,3 +177,133 @@ arr_header((arr))->length+=(n), &(arr)[arr_header((arr))->length-(n)])
 #define ARR_ADD_N_INDEX(arr, n) ((arr) = ((typeof(arr))arr_maybe_growth_helper((arr), sizeof(*(arr)), (n))),\
 arr_header((arr))->length+=(n), arr_header((arr))->length-(n))
 #define ARR_LAST(arr) (&(arr)[arr_header((arr))->length-1])
+
+
+
+
+
+struct Bucket_List_Header
+{
+    msi length;
+    msi bucket_size;
+    u8** buckets;
+    Heap_Allocator* heap;
+};
+
+
+inline
+Bucket_List_Header* bl_header(void* bl)
+{
+    return (Bucket_List_Header*)bl;
+}
+
+
+inline
+void* init_bl_helper(void* bl, msi elem_size, msi bucket_size, Heap_Allocator* heap)
+{
+    IR_ASSERT(bl==nullptr);
+    IR_ASSERT(bucket_size!=0);
+    IR_ASSERT(heap!=nullptr);
+    Bucket_List_Header* result = (Bucket_List_Header*)DYN_ALLOC(sizeof(Bucket_List_Header), heap);
+    
+    if(result)
+    {
+        result->length = 0;
+        result->bucket_size = bucket_size;
+        result->heap = heap;
+        result->buckets = nullptr;
+        
+        
+        ARR_INIT(result->buckets, 1, heap);
+        if(result->buckets == nullptr)
+        {
+            IR_SOFT_ASSERT(result->buckets && "Could not initialize bucket list because the heap allocation failed!");
+            DYN_FREE(result, heap);
+            result = nullptr;   
+        }
+        else
+        {
+            u8* first_bucket = (u8*)DYN_ALLOC(elem_size * bucket_size, heap);
+            if(!first_bucket)
+            {
+                IR_SOFT_ASSERT(first_bucket && "Could not initialize bucket list because the heap allocation failed!");
+                ARR_FREE(result->buckets);
+                DYN_FREE(result, heap);
+                result = nullptr;
+            }
+            else
+            {
+                ARR_PUSH(result->buckets, first_bucket); 
+            }
+        }
+    }
+    IR_SOFT_ASSERT(result && "Could not initialize bucket list because the heap allocation failed!");
+    return result;
+}
+
+inline
+b8 free_bl_helper(void* bl)
+{
+    Bucket_List_Header* header = bl_header(bl);
+    b8 result = true;
+    for(msi i = 0; i < ARR_LEN(header->buckets); ++i)
+    {
+        result = DYN_FREE(header->buckets[i], header->heap);
+        IR_ASSERT(result && "Bucket List Free is failing to free the individual buckets!");
+    }
+    result = ARR_FREE(header->buckets);
+    IR_ASSERT(result && "Bucket List Free is failing to free the list of bucket pointers!");
+    
+    result = DYN_FREE(header, header->heap);
+    IR_ASSERT(result && "Bucket List Free is failing to free the header!");
+        
+    return result;
+}
+
+inline
+b8 bl_maybe_growth_helper(void* bl, msi elem_size)
+{
+    IR_NOT_NULL(bl);
+    Bucket_List_Header* header = bl_header(bl);
+    
+    if(header->length == (ARR_LEN(header->buckets) * header->bucket_size))
+    {
+        u8* new_bucket = (u8*)DYN_ALLOC(elem_size * header->bucket_size, header->heap);
+        if(!new_bucket)
+        {
+            IR_SOFT_ASSERT(false && "Bucket List failed allocate new space for elements!");
+            return false;
+        }
+        else
+        {
+            if(!ARR_PUSH(header->buckets, new_bucket))
+            {
+                IR_SOFT_ASSERT(false && "Bucket List failed to grow bucket pointer list!");
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+inline 
+void* bl_get_helper(void* bl, msi elem_size, msi index)
+{
+    IR_NOT_NULL(bl);
+    Bucket_List_Header* header = bl_header(bl);
+    //IR_ASSERT(index>=header->length && "Out of bounds access to bucket list!");
+    msi bucket_index = index/header->bucket_size;
+    msi in_bucket_index = index%header->bucket_size;
+    
+    return &header->buckets[bucket_index][in_bucket_index*elem_size];
+}
+
+#define BL_INIT(bl, bucket_size, heap_ptr)(bl = ((typeof(bl))init_bl_helper(bl, sizeof(*(bl)), (bucket_size), (heap_ptr))))
+#define BL_DEL_ALL(bl)(bl_header(bl)->length=0)
+#define BL_FREE(bl)(free_bl_helper((bl)) ? ((bl)=nullptr, true) : ((bl)=nullptr, false))
+#define BL_LEN_S(bl)((s64)bl_header((bl))->length)
+#define BL_LEN(bl)((msi)bl_header((bl))->length)
+#define BL_GET(bl, index) ((typeof((bl)))bl_get_helper((bl), sizeof(*(bl)), (index)))
+#define BL_PUSH(bl, elem)((bl_maybe_growth_helper((bl), sizeof(*(bl)))) ? \
+&(*((typeof((bl)))bl_get_helper(bl, sizeof((*bl)), bl_header(bl)->length++)) = (elem)) : nullptr)
+#define BL_LAST(bl) ((typeof((bl)))bl_get_helper((bl), sizeof(*(bl)), bl_header(bl)->length-1))
